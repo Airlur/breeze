@@ -1,25 +1,32 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../models/message.dart';
-import '../../models/text_message.dart';
-import '../../models/file_message.dart';
+import '../../models/file.dart';
 import '../../services/local/db_service.dart';
 import '../../services/local/storage_service.dart';
-import 'package:file_picker/file_picker.dart';
-import '../../utils/logger.dart'; // 确保正确导入
+import '../../utils/logger.dart';
+import 'package:uuid/uuid.dart';
+import 'package:mime/mime.dart';
+import '../qr_scan/scan_result_screen.dart';
+import 'package:breeze/widgets/common/toast.dart';
+import 'dart:async';
 
-class HomeController with ChangeNotifier {
-  final DBService _dbService = DBService();
-  final StorageService _storageService = StorageService();
-
+class HomeController extends ChangeNotifier {
+  final DBService _db;
+  final StorageService _storageService;
+  double _uploadProgress = 0;
   List<Message> _messages = [];
   List<Message> _filteredMessages = [];
   bool _isLoading = false;
   bool _isSearching = false;
   final String _searchQuery = '';
+  Timer? _searchDebounceTimer;
 
   List<Message> get messages => _isSearching ? _filteredMessages : _messages;
   bool get isLoading => _isLoading;
+  double get uploadProgress => _uploadProgress;
+
+  HomeController(this._db, this._storageService);
 
   // 初始化
   Future<void> init() async {
@@ -34,44 +41,90 @@ class HomeController with ChangeNotifier {
   // 加载消息
   Future<void> _loadMessages() async {
     if (_searchQuery.isNotEmpty) {
-      _messages = await _dbService.searchMessages(_searchQuery);
+      _messages = await _db.searchMessages(_searchQuery);
     } else {
-      _messages = await _dbService.getAllMessages();
+      _messages = await _db.getAllMessages();
     }
     notifyListeners();
   }
 
   // 发送文本消息
   Future<void> sendTextMessage(String content) async {
-    final message = TextMessage(content: content);
-    await _dbService.insertMessage(message);
+    final message = Message(
+      content: content,
+      type: 'text',
+      senderDeviceId: await _storageService.getDeviceId(),
+    );
+    await _db.insertMessage(message);
     await _loadMessages();
   }
 
   // 发送文件消息
-  Future<void> sendFileMessage(PlatformFile platformFile) async {
-    _setLoading(true);
+  Future<void> sendFileMessage(String filePath,
+      {Function(double)? onProgress}) async {
     try {
-      if (platformFile.path == null) return;
+      // 1. 获取设备ID
+      final deviceId = await _storageService.getDeviceId();
 
-      final file = File(platformFile.path!);
-      final savedPath = await _storageService.saveFile(
-        file,
-        platformFile.name,
+      // 2. 获取文件信息
+      final file = File(filePath);
+      final filename = file.path.split('/').last;
+      final size = await file.length();
+      final mimeType = lookupMimeType(filePath) ?? 'application/octet-stream';
+
+      // 3. 生成文件ID
+      final fileId = const Uuid().v4();
+
+      // 4. 创建文件信息
+      final fileInfo = FileModel(
+        id: fileId,
+        filename: filename,
+        size: size,
+        url: filePath,
+        mimeType: mimeType,
+        uploadedBy: deviceId,
       );
 
-      final message = FileMessage(
-        fileName: platformFile.name,
-        filePath: savedPath,
-        fileSize: platformFile.size,
-        fileType: platformFile.extension ?? '',
-        isDownloaded: true,
+      // 5. 模拟上传过程
+      await _simulateFileUpload(file, onProgress);
+
+      // 6. 创建文件消息
+      final message = Message(
+        content: fileId,
+        type: 'file',
+        senderDeviceId: deviceId,
       );
 
-      await _dbService.insertMessage(message);
-      await _loadMessages();
-    } finally {
-      _setLoading(false);
+      // 7. 保存消息和文件信息
+      await Future.wait([
+        _db.insertMessage(message),
+        _db.insertFile(fileInfo),
+      ]);
+
+      // 8. 更新消息列表
+      _messages.add(message);
+      notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> _simulateFileUpload(
+      File file, Function(double)? onProgress) async {
+    final fileSize = await file.length();
+    int uploadedSize = 0;
+    final chunks = await file.readAsBytes();
+
+    // 模拟分块上传
+    for (var i = 0; i < chunks.length; i += 1024) {
+      // 每次处理1KB
+      await Future.delayed(const Duration(milliseconds: 100));
+      uploadedSize = i + 1024;
+      if (uploadedSize > fileSize) {
+        uploadedSize = fileSize;
+      }
+      final progress = uploadedSize / fileSize;
+      onProgress?.call(progress);
     }
   }
 
@@ -81,23 +134,20 @@ class HomeController with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      // 查找要删除的消息
-      final messageIndex = _messages.indexWhere((msg) => msg.id == id);
-      if (messageIndex == -1) {
-        throw Exception('消息不存在');
-      }
-      final message = _messages[messageIndex];
+      final message = _messages.firstWhere((msg) => msg.id == id);
 
-      // 删除数据库记录
-      await DBService().deleteMessage(id);
-
-      // 如果是文件消息，删除文件
-      if (message is FileMessage) {
-        await StorageService().deleteFile(message.filePath);
+      // 如果是文件消息，删除关联的文件
+      if (message.type == 'file') {
+        final fileInfo = await _db.getFile(message.content);
+        if (fileInfo != null) {
+          await _storageService.deleteFile(fileInfo.url);
+          await _db.deleteFile(fileInfo.id);
+        }
       }
 
-      // 更新内存中的消息列表
-      _messages.removeAt(messageIndex);
+      // 删除消息记录
+      await _db.deleteMessage(id);
+      _messages.removeWhere((msg) => msg.id == id);
 
       _isLoading = false;
       notifyListeners();
@@ -111,41 +161,49 @@ class HomeController with ChangeNotifier {
 
   // 编辑文本消息
   Future<void> editTextMessage(String messageId, String newContent) async {
-    final message =
-        _messages.firstWhere((m) => m.id == messageId) as TextMessage;
+    final message = _messages.firstWhere((m) => m.id == messageId);
+    if (message.type != 'text') {
+      throw Exception('只能编辑文本消息');
+    }
+
     final updatedMessage = message.copyWith(
       content: newContent,
       isEdited: true,
     );
 
-    await _dbService.updateMessage(updatedMessage);
+    await _db.updateMessage(updatedMessage);
     await _loadMessages();
   }
 
-  // 搜索消息
-  void searchMessages(String query) {
-    if (query.isEmpty) {
-      clearSearch();
-      return;
-    }
+  // 搜索消息和文件
+  void searchMessages(String keyword) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _isSearching = keyword.isNotEmpty;
+      if (_isSearching) {
+        _filteredMessages = _messages.where((message) {
+          final searchText = keyword.toLowerCase();
 
-    _isSearching = true;
-    _filteredMessages = _messages.where((message) {
-      if (message is TextMessage) {
-        return message.content.toLowerCase().contains(query.toLowerCase());
-      } else if (message is FileMessage) {
-        return message.fileName.toLowerCase().contains(query.toLowerCase());
+          switch (message.type) {
+            case 'text':
+              return message.content.toLowerCase().contains(searchText);
+            case 'file':
+              return message.content.toLowerCase().contains(searchText);
+            default:
+              return false;
+          }
+        }).toList();
+      } else {
+        _filteredMessages = [];
       }
-      return false;
-    }).toList();
-
-    notifyListeners();
+      notifyListeners();
+    });
   }
 
   // 清除搜索
   void clearSearch() {
     _isSearching = false;
-    _filteredMessages.clear();
+    _filteredMessages = [];
     notifyListeners();
   }
 
@@ -154,9 +212,51 @@ class HomeController with ChangeNotifier {
     notifyListeners();
   }
 
-  // 清理资源
+  // 获取文件信息
+  Future<FileModel?> getFileInfo(String fileId) async {
+    try {
+      return await _db.getFile(fileId);
+    } catch (e) {
+      debugPrint('获取文件信息失败: $e');
+      return null;
+    }
+  }
+
+  // 处理扫码结果
+  Future<void> handleScanResult(String code, BuildContext context) async {
+    try {
+      // 判断是否是URL
+      final Uri? uri = Uri.tryParse(code);
+      final bool isUrl = uri?.hasScheme ?? false;
+
+      // 跳转到扫码结果页
+      if (context.mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ScanResultScreen(
+              content: code,
+              url: isUrl ? code : null,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('处理扫码结果出错: $e');
+      if (context.mounted) {
+        Toast.error(context, '处理扫码结果失败');
+      }
+    }
+  }
+
+  void updateUploadProgress(double progress) {
+    _uploadProgress = progress;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     super.dispose();
   }
 }

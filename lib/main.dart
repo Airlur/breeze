@@ -3,9 +3,25 @@ import 'package:provider/provider.dart';
 import 'config/theme.dart';
 import 'screens/home/home_controller.dart';
 import 'screens/home/home_screen.dart';
+import 'services/local/db_service.dart';
+import 'services/local/storage_service.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final dbService = DBService();
+  final storageService = StorageService();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => HomeController(dbService, storageService),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -13,13 +29,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => HomeController(),
-      child: MaterialApp(
-        title: 'Breeze',
-        theme: AppTheme.lightTheme,
-        home: const HomeScreen(),
-      ),
+    return MaterialApp(
+      title: 'Breeze',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const HomeScreen(),
     );
   }
 }

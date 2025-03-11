@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
-import 'home_controller.dart';
 import '../../models/message.dart';
-import '../../models/text_message.dart';
-import '../../models/file_message.dart';
+import '../../models/file.dart';
 import '../../widgets/messages/text_message_item.dart';
 import '../../widgets/messages/file_message_item.dart';
-import '../../widgets/input/message_input.dart';
-import '../../widgets/common/loading_indicator.dart';
-import '../qr/qr_scanner_screen.dart';
-import '../qr/qr_result_dialog.dart';
-import '../qr/qr_code_widget.dart';
-import '../../widgets/common/toast.dart';
+import 'home_controller.dart';
+import '../qr_scan/scan_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import '../../widgets/home/settings_menu.dart';
+import 'package:breeze/widgets/common/toast.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,53 +19,78 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _searchController = TextEditingController();
   bool _isSearching = false;
-  bool _mounted = true;
+  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
+  bool _canSend = false;
+  final FocusNode _messageFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _messageController.addListener(() {
+      setState(() {
+        _canSend = _messageController.text.trim().isNotEmpty;
+      });
+    });
+
+    // 初始化消息列表
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_mounted) {
-        context.read<HomeController>().init();
-      }
+      context.read<HomeController>().init();
     });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _mounted = false;
+    _messageController.dispose();
+    _messageFocusNode.dispose();
     super.dispose();
   }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
+      backgroundColor: Colors.white.withOpacity(0.98),
+      elevation: 0,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              offset: const Offset(0, 1),
+              blurRadius: 2,
+            ),
+          ],
+        ),
+      ),
       title: _isSearching
           ? TextField(
               controller: _searchController,
               autofocus: true,
               decoration: InputDecoration(
                 hintText: '搜索消息...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
+                hintStyle: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
                 ),
-                filled: true,
-                fillColor: Colors.white,
+                border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
+                  horizontal: 0,
+                  vertical: 12,
                 ),
-                prefixIcon: const Icon(Icons.search),
               ),
               onChanged: (value) {
                 context.read<HomeController>().searchMessages(value);
               },
-              textInputAction: TextInputAction.search,
             )
-          : const Text('消息列表'),
+          : const Text(
+              'Breeze',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
       actions: [
         if (!_isSearching)
           IconButton(
@@ -90,83 +112,329 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
           ),
-        IconButton(
-          icon: const Icon(Icons.qr_code_scanner),
-          onPressed: _handleScan,
-        ),
+        if (!_isSearching) ...[
+          IconButton(
+            icon: const Icon(Icons.center_focus_weak),
+            onPressed: () async {
+              final result = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ScanScreen(),
+                ),
+              );
+
+              if (result != null && mounted) {
+                await context
+                    .read<HomeController>()
+                    .handleScanResult(result, context);
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              context.read<HomeController>().handleScanResult(
+                    'https://baidu.com',
+                    context,
+                  );
+            },
+          ),
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.more_vert),
+              onPressed: () => _showSettingsMenu(context),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  // 处理二维码扫描
-  Future<void> _handleScan() async {
-    final BuildContext currentContext = context;
+  // 构建消息列表
+  Widget _buildMessageList() {
+    return Consumer<HomeController>(
+      builder: (context, controller, child) {
+        if (controller.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    final result = await Navigator.push<String>(
-      currentContext,
-      MaterialPageRoute(builder: (context) => const QRScannerScreen()),
-    );
-
-    if (!mounted) return;
-
-    if (result != null) {
-      QRResultDialog.show(context, result);
-    }
-  }
-
-  // 处理文件选择
-  Future<void> _handleFilePick() async {
-    final homeController = context.read<HomeController>();
-
-    final result = await FilePicker.platform.pickFiles();
-
-    if (!mounted) return;
-
-    if (result != null && result.files.isNotEmpty) {
-      await homeController.sendFileMessage(result.files.first);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100], // 设置整体背景色
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          Expanded(
-            child: Consumer<HomeController>(
-              builder: (context, controller, child) {
-                if (controller.isLoading) {
-                  return const LoadingIndicator();
-                }
-
-                if (controller.messages.isEmpty) {
-                  return const Center(
-                    child: Text('暂无消息'),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: controller.messages.length,
-                  itemBuilder: (context, index) {
-                    final message = controller
-                        .messages[controller.messages.length - 1 - index];
-                    return _buildMessageItem(message);
-                  },
-                );
-              },
-            ),
-          ),
-          Container(
-            color: Colors.white,
-            child: SafeArea(
-              child: MessageInput(
-                onSend: (text) =>
-                    context.read<HomeController>().sendTextMessage(text),
-                onPickFile: _handleFilePick,
+        final messages = controller.messages;
+        if (messages.isEmpty) {
+          return Center(
+            child: Text(
+              '暂无消息',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
               ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final message = messages[index];
+            if (message.type == 'text') {
+              return TextMessageItem(
+                message: message,
+                onShowToast: _showToast,
+                onDelete: (message) => _deleteMessage(message.id),
+                onShowQr: (message) => _showQrCode(message),
+              );
+            } else {
+              // 获取文件信息
+              return FutureBuilder<FileModel?>(
+                future:
+                    context.read<HomeController>().getFileInfo(message.content),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const SizedBox.shrink();
+                  }
+                  return FileMessageItem(
+                    message: message,
+                    fileInfo: snapshot.data!,
+                    onShowToast: _showToast,
+                    onDelete: (message) => _deleteMessage(message.id),
+                    onShowQr: (message) => _showQrCode(message),
+                    onDownload: (url) => _handleFileDownload(url),
+                  );
+                },
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
+  void _showToast(String message) {
+    Toast.success(context, message);
+  }
+
+  // 删除消息
+  Future<void> _deleteMessage(String messageId) async {
+    try {
+      await context.read<HomeController>().deleteMessage(messageId);
+      _showToast('消息已删除');
+    } catch (e) {
+      _showToast('删除失败：$e');
+    }
+  }
+
+  // 显示二维码
+  void _showQrCode(Message message) {
+    // TODO: 实现二维码显示
+  }
+
+  // 处理文件下载
+  Future<void> _handleFileDownload(String url) async {
+    // TODO: 实现文件下载
+    _showToast('开始下载文件...');
+  }
+
+  // 选择文件
+  Future<void> _pickFile(List<String> allowedExtensions) async {
+    try {
+      Navigator.pop(context); // 关闭底部菜单
+
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: allowedExtensions,
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = File(result.files.single.path!);
+        final fileSize = await file.length();
+
+        if (!mounted) return; // 添加 mounted 检查
+
+        if (fileSize > 100 * 1024 * 1024) {
+          // 100MB
+          Toast.warning(context, '文件大小不能超过100MB');
+          return;
+        }
+
+        // 显示上传进度对话框
+        if (!mounted) return;
+        _showUploadProgress(context);
+
+        // 发送文件消息
+        await context.read<HomeController>().sendFileMessage(
+          file.path,
+          onProgress: (progress) {
+            // 更新进度
+            if (!mounted) return;
+            context.read<HomeController>().updateUploadProgress(progress);
+          },
+        );
+
+        // 关闭进度对话框
+        if (!mounted) return;
+        Navigator.of(context).pop();
+
+        Toast.success(context, '文件发送成功');
+      }
+    } catch (e) {
+      if (!mounted) return; // 添加 mounted 检查
+      Toast.error(context, '文件发送失败：$e');
+    }
+  }
+
+  // 显示上传进度对话框
+  void _showUploadProgress(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Consumer<HomeController>(
+        builder: (context, controller, child) {
+          return AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text('正在发送文件... ${(controller.uploadProgress * 100).toInt()}%'),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 构建显示附件选项
+  Widget _buildAttachmentOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 80,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 显示附件选项弹窗
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildAttachmentOption(
+                    icon: Icons.photo,
+                    label: '图片',
+                    onTap: () => _pickFile(['jpg', 'jpeg', 'png', 'gif']),
+                  ),
+                  _buildAttachmentOption(
+                    icon: Icons.folder,
+                    label: '文件',
+                    onTap: () =>
+                        _pickFile(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt']),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 处理设备管理
+  void _handleDeviceManage(BuildContext context) {
+    debugPrint('点击了设备管理');
+    Navigator.pop(context);
+    // TODO: 实现设备管理
+  }
+
+  // 处理清空消息
+  void _handleClearMessages(BuildContext context) {
+    debugPrint('点击了清空消息');
+    Navigator.pop(context);
+    // TODO: 实现清空消息
+  }
+
+  // 处理文件管理
+  void _handleFileManage(BuildContext context) {
+    debugPrint('点击了文件管理');
+    Navigator.pop(context);
+    // TODO: 实现文件管理
+  }
+
+  // 处理退出登录
+  void _handleLogout(BuildContext context) {
+    debugPrint('点击了退出登录');
+    Navigator.pop(context);
+    // TODO: 实现退出登录
+  }
+
+  // 显示设置菜单
+  void _showSettingsMenu(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.transparent,
+      builder: (BuildContext context) => Stack(
+        children: [
+          ModalBarrier(
+            color: Colors.transparent,
+            dismissible: true,
+            onDismiss: () {
+              Navigator.pop(context);
+            },
+          ),
+          Positioned(
+            top: kToolbarHeight + MediaQuery.of(context).padding.top,
+            right: 8,
+            child: SettingsMenu(
+              onDeviceManage: () => _handleDeviceManage(context),
+              onClearMessages: () => _handleClearMessages(context),
+              onFileManage: () => _handleFileManage(context),
+              onLogout: () => _handleLogout(context),
             ),
           ),
         ],
@@ -174,55 +442,86 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMessageItem(Message message) {
-    if (message is TextMessage) {
-      return TextMessageItem(
-        message: message,
-        onDelete: () =>
-            context.read<HomeController>().deleteMessage(message.id),
-        onShowQr: () => _showQRCode(message.toQrData()),
-        onShowToast: (msg) => Toast.show(context, msg),
-        onEdit: (newContent) => context.read<HomeController>().editTextMessage(
-              message.id,
-              newContent,
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: _buildAppBar(),
+        body: Column(
+          children: [
+            Expanded(
+              child: _buildMessageList(),
             ),
-      );
-    } else if (message is FileMessage) {
-      return FileMessageItem(
-        message: message,
-        onDelete: () =>
-            context.read<HomeController>().deleteMessage(message.id),
-        onShowQr: () => _showQRCode(message.toQrData()),
-        onShowToast: (msg) => Toast.show(context, msg),
-        onDownload: (path) async {
-          // TODO: 集成文件下载服务
-        },
-      );
-    }
-    return const SizedBox.shrink();
-  }
-
-  void _showQRCode(String data) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // 使用最小所需空间
-            children: [
-              SizedBox(
-                width: 280, // 增加宽度
-                height: 250, // 增加高度
-                child: QRCodeWidget(data: data),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.98),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    offset: const Offset(0, -1),
+                    blurRadius: 2,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('关闭'),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: SafeArea(
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.attach_file,
+                        color: Colors.grey,
+                      ),
+                      onPressed: _showAttachmentOptions,
+                    ),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: TextField(
+                          controller: _messageController,
+                          focusNode: _messageFocusNode,
+                          decoration: const InputDecoration(
+                            hintText: '输入消息...',
+                            hintStyle: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.send,
+                        color: _canSend ? Colors.black : Colors.grey[400],
+                      ),
+                      onPressed: _canSend
+                          ? () {
+                              final message = _messageController.text.trim();
+                              if (message.isNotEmpty) {
+                                context
+                                    .read<HomeController>()
+                                    .sendTextMessage(message);
+                                _messageController.clear();
+                              }
+                            }
+                          : null,
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,7 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import '../../config/constants.dart';
 import '../../models/message.dart';
+import '../../models/file.dart';
+import '../../models/device.dart';
 import '../../utils/logger.dart';
 
 class DBService {
@@ -9,16 +10,18 @@ class DBService {
   factory DBService() => _instance;
   DBService._internal();
 
-  Database? _db;
+  static Database? _db;
+  static const String dbName = 'chat.db';
 
   Future<Database> get database async {
-    _db ??= await _initDB();
+    if (_db != null) return _db!;
+    _db = await _initDB();
     return _db!;
   }
 
   Future<Database> _initDB() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, AppConstants.dbName);
+    final path = join(dbPath, dbName);
 
     return await openDatabase(
       path,
@@ -26,18 +29,42 @@ class DBService {
       onCreate: (db, version) async {
         // 创建消息表
         await db.execute('''
-          CREATE TABLE ${AppConstants.messageTable} (
+          CREATE TABLE messages (
             id TEXT PRIMARY KEY,
-            timestamp INTEGER NOT NULL,
+            content TEXT NOT NULL,
             type TEXT NOT NULL,
-            content TEXT,
-            isDeleted INTEGER DEFAULT 0,
-            isEdited INTEGER DEFAULT 0,
-            fileName TEXT,
-            filePath TEXT,
-            fileSize INTEGER,
-            fileType TEXT,
-            isDownloaded INTEGER DEFAULT 0
+            sender_device_id TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            is_encrypted INTEGER NOT NULL DEFAULT 0,
+            is_edited INTEGER NOT NULL DEFAULT 0,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+          )
+        ''');
+
+        // 创建文件表
+        await db.execute('''
+          CREATE TABLE files (
+            id TEXT PRIMARY KEY,
+            url TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            mime_type TEXT NOT NULL,
+            uploaded_by TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          )
+        ''');
+
+        // 创建设备表
+        await db.execute('''
+          CREATE TABLE devices (
+            id TEXT PRIMARY KEY,
+            device_id TEXT NOT NULL,
+            device_name TEXT NOT NULL,
+            device_type TEXT NOT NULL,
+            is_master INTEGER NOT NULL DEFAULT 0,
+            last_active TEXT,
+            created_at TEXT NOT NULL
           )
         ''');
       },
@@ -49,7 +76,7 @@ class DBService {
     try {
       final db = await database;
       await db.insert(
-        AppConstants.messageTable,
+        'messages',
         message.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -64,8 +91,7 @@ class DBService {
     try {
       final db = await database;
       final List<Map<String, dynamic>> maps = await db.query(
-        AppConstants.messageTable,
-        where: 'isDeleted = 0',
+        'messages',
         orderBy: 'timestamp DESC',
       );
 
@@ -81,8 +107,7 @@ class DBService {
     try {
       final db = await database;
       final List<Map<String, dynamic>> maps = await db.query(
-        AppConstants.messageTable,
-        where: 'isDeleted = 0',
+        'messages',
         orderBy: 'timestamp DESC',
         limit: limit,
         offset: offset,
@@ -100,9 +125,9 @@ class DBService {
     try {
       final db = await database;
       final List<Map<String, dynamic>> maps = await db.query(
-        AppConstants.messageTable,
-        where: 'content LIKE ? OR fileName LIKE ?',
-        whereArgs: ['%$query%', '%$query%'],
+        'messages',
+        where: 'content LIKE ?',
+        whereArgs: ['%$query%'],
         orderBy: 'timestamp DESC',
       );
 
@@ -117,21 +142,13 @@ class DBService {
   Future<void> deleteMessage(String id) async {
     try {
       final db = await database;
-
-      final result = await db.update(
-        AppConstants.messageTable,
-        {'isDeleted': 1},
+      await db.delete(
+        'messages',
         where: 'id = ?',
         whereArgs: [id],
       );
-
-      if (result > 0) {
-        AppLogger.debug('DBService - 消息记录删除成功，影响行数: $result');
-      } else {
-        AppLogger.warning('DBService - 未找到要删除的消息记录: $id');
-      }
     } catch (e, stackTrace) {
-      AppLogger.error('DBService - 删除消息记录失败', e, stackTrace);
+      AppLogger.error('删除消息失败', e, stackTrace);
       rethrow;
     }
   }
@@ -141,7 +158,7 @@ class DBService {
     try {
       final db = await database;
       await db.update(
-        AppConstants.messageTable,
+        'messages',
         message.toMap(),
         where: 'id = ?',
         whereArgs: [message.id],
@@ -150,5 +167,71 @@ class DBService {
       AppLogger.error('更新消息失败', e, stackTrace);
       rethrow;
     }
+  }
+
+  // 文件相关操作
+  Future<void> insertFile(FileModel file) async {
+    final db = await database;
+    await db.insert(
+      'files',
+      file.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<FileModel?> getFile(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'files',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return FileModel.fromMap(maps.first);
+  }
+
+  Future<void> deleteFile(String id) async {
+    final db = await database;
+    await db.delete(
+      'files',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // 设备相关操作
+  Future<void> insertDevice(Device device) async {
+    final db = await database;
+    await db.insert(
+      'devices',
+      device.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Device?> getDevice(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'devices',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return Device.fromMap(maps.first);
+  }
+
+  Future<List<Device>> getAllDevices() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('devices');
+    return List.generate(maps.length, (i) => Device.fromMap(maps[i]));
+  }
+
+  Future<void> deleteDevice(String id) async {
+    final db = await database;
+    await db.delete(
+      'devices',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }
