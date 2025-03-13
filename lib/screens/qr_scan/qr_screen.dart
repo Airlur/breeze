@@ -1,15 +1,81 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:breeze/widgets/common/toast.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:ui' as ui;
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:breeze/utils/permission_util.dart';
 
-class QrScreen extends StatelessWidget {
+class QrScreen extends StatefulWidget {
   final String content;
 
   const QrScreen({
     super.key,
     required this.content,
   });
+
+  @override
+  State<QrScreen> createState() => _QrScreenState();
+}
+
+class _QrScreenState extends State<QrScreen> {
+  final GlobalKey _qrKey = GlobalKey();
+
+  // 保存二维码到相册
+  Future<void> _saveQrCode(BuildContext context) async {
+    try {
+      if (!context.mounted) return;
+
+      // 请求相册权限
+      final hasPermission =
+          await PermissionUtil().requestPhotosPermission(context);
+      if (!hasPermission) return;
+
+      debugPrint('开始生成二维码图片...');
+      final boundary =
+          _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final buffer = byteData!.buffer.asUint8List();
+      debugPrint('二维码图片生成成功，大小: ${buffer.length} bytes');
+
+      // 保存到相册
+      debugPrint('开始保存到相册...');
+      final result = await ImageGallerySaver.saveImage(
+        buffer,
+        quality: 100,
+        name: 'qr_code_${DateTime.now().millisecondsSinceEpoch}',
+      );
+      debugPrint('保存结果: $result');
+
+      if (!context.mounted) return;
+      if (result['isSuccess']) {
+        final filePath = result['filePath'];
+        debugPrint('保存成功，文件路径: $filePath');
+        Toast.success(context, '二维码已保存到相册');
+      } else {
+        debugPrint('保存失败: ${result['error']}');
+        Toast.error(context, '保存失败');
+      }
+    } catch (e) {
+      debugPrint('发生错误: $e');
+      if (!context.mounted) return;
+      Toast.error(context, '保存失败：$e');
+    }
+  }
+
+  // 分享二维码
+  Future<void> _shareQrCode(BuildContext context) async {
+    try {
+      if (!context.mounted) return;
+      await Share.share(widget.content);
+    } catch (e) {
+      if (!context.mounted) return;
+      Toast.error(context, '分享失败：$e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,25 +103,28 @@ class QrScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 32),
             // 二维码
-            Container(
-              width: 256,
-              height: 256,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16),
-              child: QrImageView(
-                data: content,
-                version: QrVersions.auto,
-                size: 200,
+            RepaintBoundary(
+              key: _qrKey,
+              child: Container(
+                width: 256,
+                height: 256,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: QrImageView(
+                  data: widget.content,
+                  version: QrVersions.auto,
+                  size: 200,
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -67,48 +136,85 @@ class QrScreen extends StatelessWidget {
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '原始内容',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
+              child: SelectableText.rich(
+                // 使用 SelectableText 来控制文本选择
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '原始内容\n',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    content,
-                    style: const TextStyle(
-                      fontSize: 16,
+                    TextSpan(
+                      text: widget.content,
+                      style: const TextStyle(
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const Spacer(),
-            // 复制按钮
+            // 操作按钮
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: content)).then((_) {
-                      Toast.success(context, '已复制到剪贴板');
-                    });
-                  },
-                  icon: const Icon(Icons.copy),
-                  label: const Text('复制'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _saveQrCode(context),
+                      icon: const Icon(Icons.save),
+                      label: const Text('保存'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.black87,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
                     ),
-                    minimumSize: const Size.fromHeight(48),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _shareQrCode(context),
+                      icon: const Icon(Icons.share),
+                      label: const Text('分享'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.black87,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: widget.content))
+                            .then((_) {
+                          Toast.success(context, '已复制到剪贴板');
+                        });
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('复制'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

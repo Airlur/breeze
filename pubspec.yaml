@@ -2,7 +2,7 @@ name: breeze
 description: "A modern messaging app with local-first approach."
 
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.0.1+1
 
 environment:
   sdk: '>=3.4.3 <4.0.0'
@@ -45,6 +45,8 @@ dependencies:
   image_picker: ^1.0.4
   mobile_scanner: ^3.5.5
   url_launcher: ^6.3.1
+  share_plus: ^7.2.2
+  image_gallery_saver: ^2.0.3
 
 dev_dependencies:
   flutter_test:
