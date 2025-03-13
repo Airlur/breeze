@@ -1,6 +1,12 @@
 import 'package:uuid/uuid.dart';
+import '../services/local/storage_service.dart';
+import '../services/local/db_service.dart';
 
 class Message {
+  static final Map<String, String> _deviceNameCache = {};
+  final StorageService _storageService = StorageService();
+  final DBService _db = DBService();
+
   final String id;
   final String content; // 消息内容或文件消息的file_id
   final String type; // 消息类型 (text/file)
@@ -29,25 +35,67 @@ class Message {
   // 格式化时间
   String get formattedTime {
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    final now = DateTime.now();
+
+    // 如果是今天的消息，只显示时间
+    if (date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day) {
+      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    }
+
+    // 如果是昨天的消息
+    final yesterday = now.subtract(const Duration(days: 1));
+    if (date.year == yesterday.year &&
+        date.month == yesterday.month &&
+        date.day == yesterday.day) {
+      return '昨天 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    }
+
+    // 如果是今年的消息
+    if (date.year == now.year) {
+      return '${date.month}月${date.day}日 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    }
+
+    // 其他情况显示完整日期
+    return '${date.year}年${date.month}月${date.day}日 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  // 获取设备名称
-  String get deviceName {
-    // 根据设备ID查设备表获取设备名称返回
-    return senderDeviceId;
+  // 获取设备名称（带缓存）
+  Future<String> get deviceName async {
+    // 先检查缓存
+    if (_deviceNameCache.containsKey(senderDeviceId)) {
+      return _deviceNameCache[senderDeviceId]!;
+    }
+
+    // 如果是当前设备的消息
+    final currentDeviceId = await _storageService.getDeviceId();
+    if (senderDeviceId == currentDeviceId) {
+      final name = await _storageService.getDeviceName();
+      _deviceNameCache[senderDeviceId] = name;
+      return name;
+    }
+
+    // 其他设备的消息，从数据库查询
+    final device = await _db.getDevice(senderDeviceId);
+    final name = device?.deviceName ?? senderDeviceId;
+    _deviceNameCache[senderDeviceId] = name;
+    
+    return name;
   }
 
-  // 获取设备缩写
-  String get deviceInitials {
-    final name = deviceName;
+  // 获取设备缩写（也需要是异步的）
+  Future<String> get deviceInitials async {
+    final name = await deviceName;
     if (name.isEmpty) return '';
+    
     final initials = name
         .split(' ')
         .where((word) => word.isNotEmpty)
         .map((word) => word[0].toUpperCase())
         .take(2)
         .join();
+        
     return initials.isEmpty ? name[0].toUpperCase() : initials;
   }
 

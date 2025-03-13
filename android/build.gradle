@@ -1,9 +1,19 @@
+buildscript {
+    repositories {
+        // 构建工具的仓库源
+        google()
+        mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+    }
+}
+
 allprojects {
     repositories {
-//        google()
-//        mavenCentral()
+        // 项目依赖的仓库源
+        google()
+        mavenCentral()
         maven { url 'https://maven.aliyun.com/repository/google' }
-        maven { url 'https://maven.aliyun.com/repository/jcenter' }
         maven { url 'https://maven.aliyun.com/repository/public' }
     }
 }

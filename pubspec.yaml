@@ -54,7 +54,10 @@ dev_dependencies:
   flutter_lints: ^3.0.1
   build_runner: ^2.4.8
   mockito: ^5.4.4
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
 

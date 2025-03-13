@@ -12,6 +12,14 @@ void main() async {
   final dbService = DBService();
   final storageService = StorageService();
 
+  // 先清理，再初始化本机设备信息
+  try {
+    // await storageService.cleanLocalDevice(); // 先清理
+    await storageService.initLocalDevice(); // 再初始化
+  } catch (e) {
+    debugPrint('初始化设备信息失败: $e');
+  }
+
   runApp(
     MultiProvider(
       providers: [

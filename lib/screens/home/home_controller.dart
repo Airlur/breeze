@@ -50,10 +50,11 @@ class HomeController extends ChangeNotifier {
 
   // 发送文本消息
   Future<void> sendTextMessage(String content) async {
+    final deviceId = await _storageService.getDeviceId();
     final message = Message(
       content: content,
       type: 'text',
-      senderDeviceId: await _storageService.getDeviceId(),
+      senderDeviceId: deviceId,
     );
     await _db.insertMessage(message);
     await _loadMessages();

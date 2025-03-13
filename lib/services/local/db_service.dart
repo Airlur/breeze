@@ -209,12 +209,12 @@ class DBService {
     );
   }
 
-  Future<Device?> getDevice(String id) async {
+  Future<Device?> getDevice(String deviceId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'devices',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'device_id = ?',
+      whereArgs: [deviceId],
     );
     if (maps.isEmpty) return null;
     return Device.fromMap(maps.first);

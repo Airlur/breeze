@@ -25,7 +25,8 @@ if (flutterVersionName == null) {
 
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
-if (keystorePropertiesFile.exists()) {
+def useSigningConfig = keystorePropertiesFile.exists()
+if (useSigningConfig) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
@@ -51,20 +52,18 @@ android {
     }
 
     signingConfigs {
-        release {
-            keyAlias 'breeze'
-            keyPassword keystoreProperties['keyPassword']
-            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-            storePassword keystoreProperties['storePassword']
+        if (useSigningConfig) {
+            release {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
         }
     }
 
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-//            'flutter build apk --release'
-//            signingConfig = signingConfigs.debug
-
             // **添加了启用混淆**
             minifyEnabled true // 添加了这行
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro' // 添加了这行
@@ -72,7 +71,14 @@ android {
             // **添加了启用资源缩减**
             shrinkResources true // 添加了这行
 
-            signingConfig signingConfigs.release
+            // 仅在有签名配置时使用
+            if (useSigningConfig) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            // debug 版本使用默认签名
+            signingConfig signingConfigs.debug
         }
     }
 

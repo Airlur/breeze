@@ -17,6 +17,11 @@ class Device {
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
+  @override
+  String toString() {
+    return 'Device{id: $id, deviceId: $deviceId, deviceName: $deviceName, deviceType: $deviceType, isMaster: $isMaster, lastActive: $lastActive, createdAt: $createdAt}';
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

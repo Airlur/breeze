@@ -4,6 +4,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/logger.dart';
+import '../../models/device.dart';
+import './db_service.dart';
+import 'package:uuid/uuid.dart';
 
 class StorageService {
   static final StorageService _instance = StorageService._internal();
@@ -12,6 +15,7 @@ class StorageService {
 
   static const String _deviceIdKey = 'device_id';
   static const String _deviceNameKey = 'device_name';
+  final DBService _db = DBService();
 
   Future<String> get _localPath async {
     final directory = await getApplicationDocumentsDirectory();
@@ -54,7 +58,76 @@ class StorageService {
       await prefs.setString(_deviceNameKey, deviceName);
     }
 
+    // 清理后需要重新生成设备名称
+    if (await _db.getDevice(await getDeviceId()) == null) {
+      deviceName = await _generateDeviceName();
+      await prefs.setString(_deviceNameKey, deviceName);
+    }
+
     return deviceName;
+  }
+
+  // 清理本机设备记录（用于开发测试）
+  Future<void> cleanLocalDevice() async {
+    try {
+      final deviceId = await getDeviceId();
+      // 清理 SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_deviceNameKey);
+
+      // 清理数据库中的所有匹配记录
+      final devices = await _db.getAllDevices();
+      for (var device in devices) {
+        if (device.deviceId == deviceId) {
+          await _db.deleteDevice(device.id);
+          AppLogger.info('清理设备记录成功: $device');
+        }
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('清理设备记录失败', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  // 初始化本机设备信息
+  Future<void> initLocalDevice() async {
+    try {
+      final deviceId = await getDeviceId();
+      final deviceName = await getDeviceName();
+
+      // 先查询是否已存在设备记录
+      final existingDevice = await _db.getDevice(deviceId);
+      if (existingDevice != null) {
+        // 如果存在，更新最后活动时间
+        final updatedDevice = Device(
+          id: existingDevice.id,
+          deviceId: existingDevice.deviceId,
+          deviceName: existingDevice.deviceName,
+          deviceType: existingDevice.deviceType,
+          isMaster: existingDevice.isMaster,
+          lastActive: DateTime.now(), // 更新最后活动时间
+          createdAt: existingDevice.createdAt,
+        );
+        await _db.insertDevice(updatedDevice);
+        AppLogger.info('更新设备信息: $updatedDevice');
+      } else {
+        // 如果不存在，创建新记录
+        final newDevice = Device(
+          id: const Uuid().v4(),
+          deviceId: deviceId,
+          deviceName: deviceName,
+          deviceType: Platform.isAndroid ? 'android' : 'ios',
+          isMaster: true,
+          lastActive: DateTime.now(),
+          createdAt: DateTime.now(),
+        );
+        await _db.insertDevice(newDevice);
+        AppLogger.info('初始化设备信息: $newDevice');
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('初始化设备信息失败', e, stackTrace);
+      rethrow;
+    }
   }
 
   // 保存文件
@@ -153,7 +226,11 @@ class StorageService {
     final deviceInfo = DeviceInfoPlugin();
     if (Platform.isAndroid) {
       final androidInfo = await deviceInfo.androidInfo;
-      return androidInfo.model;
+      AppLogger.info(
+          '设备信息: brand=${androidInfo.brand}, model=${androidInfo.model}, manufacturer=${androidInfo.manufacturer}, product=${androidInfo.product}, device=${androidInfo.device}');
+
+      // 使用字符串插值而不是 + 拼接
+      return '${androidInfo.manufacturer} ${androidInfo.model}';
     } else if (Platform.isIOS) {
       final iosInfo = await deviceInfo.iosInfo;
       return iosInfo.name;

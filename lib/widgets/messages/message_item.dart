@@ -29,21 +29,33 @@ abstract class MessageItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: Colors.blue[100],
-            child: Text(message.deviceInitials),
+          FutureBuilder<String>(
+            future: message.deviceInitials,
+            initialData: "?",  // 加载时显示问号
+            builder: (context, snapshot) {
+              return CircleAvatar(
+                backgroundColor: Colors.blue[100],
+                child: Text(snapshot.data ?? "?"),
+              );
+            },
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  message.deviceName,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                FutureBuilder<String>(
+                  future: message.deviceName,
+                  initialData: message.senderDeviceId,  // 加载时显示设备ID
+                  builder: (context, snapshot) {
+                    return Text(
+                      snapshot.data ?? message.senderDeviceId,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 4),
                 buildMessageContent(context),
@@ -62,5 +74,4 @@ abstract class MessageItem extends StatelessWidget {
       ),
     );
   }
-
 }
