@@ -80,7 +80,7 @@ class Message {
     final device = await _db.getDevice(senderDeviceId);
     final name = device?.deviceName ?? senderDeviceId;
     _deviceNameCache[senderDeviceId] = name;
-    
+
     return name;
   }
 
@@ -88,14 +88,14 @@ class Message {
   Future<String> get deviceInitials async {
     final name = await deviceName;
     if (name.isEmpty) return '';
-    
+
     final initials = name
         .split(' ')
         .where((word) => word.isNotEmpty)
         .map((word) => word[0].toUpperCase())
         .take(2)
         .join();
-        
+
     return initials.isEmpty ? name[0].toUpperCase() : initials;
   }
 
