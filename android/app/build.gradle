@@ -23,6 +23,12 @@ if (flutterVersionName == null) {
     flutterVersionName = "1.0"
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.airlur.breeze"
     compileSdk = flutter.compileSdkVersion
@@ -44,6 +50,15 @@ android {
         versionName = flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            keyAlias 'breeze'
+            keyPassword keystoreProperties['keyPassword']
+            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
     buildTypes {
         release {
             // Signing with the debug keys for now, so `flutter run --release` works.
@@ -57,8 +72,7 @@ android {
             // **添加了启用资源缩减**
             shrinkResources true // 添加了这行
 
-            // TODO: 添加你的签名配置
-            signingConfig = signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
 
