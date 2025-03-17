@@ -59,8 +59,18 @@ class _ScanScreenState extends State<ScanScreen>
             controller: _scannerController,
             onDetect: (capture) {
               final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                Navigator.pop(context, barcodes.first.rawValue);
+              // 确保只处理一次扫码结果
+              if (barcodes.isNotEmpty &&
+                  barcodes.first.rawValue != null &&
+                  mounted) {
+                // 先停止扫描
+                _scannerController.stop();
+                // 使用 Future.delayed 确保扫描器完全停止后再处理结果
+                Future.delayed(Duration.zero, () {
+                  if (mounted) {
+                    Navigator.pop(context, barcodes.first.rawValue);
+                  }
+                });
               }
             },
           ),
