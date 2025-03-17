@@ -92,7 +92,7 @@ class DBService {
       final db = await database;
       final List<Map<String, dynamic>> maps = await db.query(
         'messages',
-        orderBy: 'timestamp DESC',
+        orderBy: 'timestamp ASC',
       );
 
       return List.generate(maps.length, (i) => Message.fromMap(maps[i]));
@@ -108,7 +108,7 @@ class DBService {
       final db = await database;
       final List<Map<String, dynamic>> maps = await db.query(
         'messages',
-        orderBy: 'timestamp DESC',
+        orderBy: 'timestamp ASC',
         limit: limit,
         offset: offset,
       );

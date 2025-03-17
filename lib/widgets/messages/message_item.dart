@@ -31,7 +31,7 @@ abstract class MessageItem extends StatelessWidget {
         children: [
           FutureBuilder<String>(
             future: message.deviceInitials,
-            initialData: "?",  // 加载时显示问号
+            initialData: "?", // 加载时显示问号
             builder: (context, snapshot) {
               return CircleAvatar(
                 backgroundColor: Colors.blue[100],
@@ -46,7 +46,7 @@ abstract class MessageItem extends StatelessWidget {
               children: [
                 FutureBuilder<String>(
                   future: message.deviceName,
-                  initialData: message.senderDeviceId,  // 加载时显示设备ID
+                  initialData: message.senderDeviceId, // 加载时显示设备ID
                   builder: (context, snapshot) {
                     return Text(
                       snapshot.data ?? message.senderDeviceId,

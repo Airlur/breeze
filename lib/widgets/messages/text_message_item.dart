@@ -17,6 +17,17 @@ class TextMessageItem extends MessageItem {
   void _showActionMenu(BuildContext context) {
     final RenderBox button = context.findRenderObject() as RenderBox;
     final Offset offset = button.localToGlobal(Offset.zero);
+    final Size screenSize = MediaQuery.of(context).size;
+
+    // 获取消息的尺寸
+    final messageHeight = button.size.height;
+    final messageTop = offset.dy;
+
+    // 判断消息是否在屏幕上半部分
+    final isInUpperHalf = messageTop < screenSize.height / 2;
+
+    // 判断消息是否太长（超过屏幕高度的70%）
+    final isMessageTooLong = messageHeight > screenSize.height * 0.7;
 
     showDialog(
       context: context,
@@ -32,7 +43,17 @@ class TextMessageItem extends MessageItem {
           Positioned(
             left: 24,
             right: 24,
-            top: offset.dy + button.size.height / 2,
+            // 根据条件决定菜单位置
+            top: isMessageTooLong
+                ? screenSize.height * 0.3 // 如果消息太长，固定在屏幕中上部
+                : isInUpperHalf
+                    ? messageTop + messageHeight / 2 // 如果在上半部分，显示在消息下方
+                    : null, // 如果在下半部分，使用 bottom 定位
+            bottom: isMessageTooLong
+                ? null
+                : isInUpperHalf
+                    ? null // 如果在上半部分，不需要 bottom
+                    : screenSize.height - messageTop, // 如果在下半部分，显示在消息上方
             child: MessageActionMenu(
               message: message,
               onMultiSelect: () {
