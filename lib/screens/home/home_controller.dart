@@ -196,7 +196,7 @@ class HomeController extends ChangeNotifier {
     try {
       return await _db.getFile(fileId);
     } catch (e) {
-      debugPrint('获取文件信息失败: $e');
+      AppLogger.error('获取文件信息失败: $e');
       return null;
     }
   }
@@ -221,7 +221,7 @@ class HomeController extends ChangeNotifier {
         );
       }
     } catch (e) {
-      debugPrint('处理扫码结果出错: $e');
+      AppLogger.error('处理扫码结果出错: $e');
       if (context.mounted) {
         Toast.error(context, '处理扫码结果失败');
       }

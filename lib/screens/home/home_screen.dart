@@ -10,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../../widgets/home/settings_menu.dart';
 import 'package:breeze/widgets/common/toast.dart';
+import '../debug/log_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -133,10 +134,12 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.bug_report),
             onPressed: () {
-              context.read<HomeController>().handleScanResult(
-                    'https://baidu.com',
-                    context,
-                  );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LogScreen(),
+                ),
+              );
             },
           ),
           Builder(

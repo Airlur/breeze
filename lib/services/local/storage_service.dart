@@ -227,14 +227,40 @@ class StorageService {
     if (Platform.isAndroid) {
       final androidInfo = await deviceInfo.androidInfo;
       AppLogger.info(
-          '设备信息: brand=${androidInfo.brand}, model=${androidInfo.model}, manufacturer=${androidInfo.manufacturer}, product=${androidInfo.product}, device=${androidInfo.device}');
+          '设备信息: brand=${androidInfo.brand}, model=${androidInfo.model}, '
+          'manufacturer=${androidInfo.manufacturer}, product=${androidInfo.product}, '
+          'device=${androidInfo.device}, display=${androidInfo.display}');
 
-      // 使用字符串插值而不是 + 拼接
-      return '${androidInfo.manufacturer} ${androidInfo.model}';
+      try {
+        // 尝试使用 Process.run 获取额外的系统属性
+        final result = await Process.run('getprop', ['ro.product.marketname']);
+        final marketName = result.stdout.toString().trim();
+        
+        if (marketName.isNotEmpty) {
+          AppLogger.debug('获取到营销名称: $marketName');
+          
+          // 返回品牌名+营销名称
+          return '${androidInfo.manufacturer} $marketName';
+        }
+        
+        // 如果获取不到营销名称，尝试其他属性
+        final modelResult = await Process.run('getprop', ['ro.product.model']);
+        final modelName = modelResult.stdout.toString().trim();
+        
+        if (modelName.isNotEmpty) {
+          AppLogger.debug('获取到型号名称: $modelName');
+          
+          // 返回品牌名+型号名称
+          return '${androidInfo.manufacturer} $modelName';
+        }
+      } catch (e) {
+        AppLogger.error('获取系统属性失败: $e');
+      }
+
     } else if (Platform.isIOS) {
       final iosInfo = await deviceInfo.iosInfo;
       return iosInfo.name;
     }
-    return 'Unknown Device';
+    return '未知设备';
   }
 }

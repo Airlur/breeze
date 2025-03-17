@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'dart:ui' as ui;
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:breeze/utils/permission_util.dart';
+import 'package:breeze/utils/logger.dart';
 
 class QrScreen extends StatefulWidget {
   final String content;
@@ -33,34 +34,34 @@ class _QrScreenState extends State<QrScreen> {
           await PermissionUtil().requestPhotosPermission(context);
       if (!hasPermission) return;
 
-      debugPrint('开始生成二维码图片...');
+      AppLogger.info('开始生成二维码图片...');
       final boundary =
           _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary;
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final buffer = byteData!.buffer.asUint8List();
-      debugPrint('二维码图片生成成功，大小: ${buffer.length} bytes');
+      AppLogger.info('二维码图片生成成功，大小: ${buffer.length} bytes');
 
       // 保存到相册
-      debugPrint('开始保存到相册...');
+      AppLogger.info('开始保存到相册...');
       final result = await ImageGallerySaver.saveImage(
         buffer,
         quality: 100,
         name: 'qr_code_${DateTime.now().millisecondsSinceEpoch}',
       );
-      debugPrint('保存结果: $result');
+      AppLogger.info('保存结果: $result');
 
       if (!context.mounted) return;
       if (result['isSuccess']) {
         final filePath = result['filePath'];
-        debugPrint('保存成功，文件路径: $filePath');
+        AppLogger.info('保存成功，文件路径: $filePath');
         Toast.success(context, '二维码已保存到相册');
       } else {
-        debugPrint('保存失败: ${result['error']}');
+        AppLogger.error('保存失败: ${result['error']}');
         Toast.error(context, '保存失败');
       }
     } catch (e) {
-      debugPrint('发生错误: $e');
+      AppLogger.error('发生错误: $e');
       if (!context.mounted) return;
       Toast.error(context, '保存失败：$e');
     }
