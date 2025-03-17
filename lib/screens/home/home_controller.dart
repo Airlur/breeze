@@ -61,8 +61,7 @@ class HomeController extends ChangeNotifier {
   }
 
   // 发送文件消息
-  Future<void> sendFileMessage(String filePath,
-      {Function(double)? onProgress}) async {
+  Future<void> sendFileMessage(String filePath) async {
     try {
       // 1. 获取设备ID
       final deviceId = await _storageService.getDeviceId();
@@ -86,46 +85,25 @@ class HomeController extends ChangeNotifier {
         uploadedBy: deviceId,
       );
 
-      // 5. 模拟上传过程
-      await _simulateFileUpload(file, onProgress);
-
-      // 6. 创建文件消息
+      // 5. 创建文件消息
       final message = Message(
         content: fileId,
         type: 'file',
         senderDeviceId: deviceId,
       );
 
-      // 7. 保存消息和文件信息
+      // 6. 保存消息和文件信息
       await Future.wait([
         _db.insertMessage(message),
         _db.insertFile(fileInfo),
       ]);
 
-      // 8. 更新消息列表
-      _messages.add(message);
-      notifyListeners();
+      // _messages.add(message);
+      // notifyListeners();
+
+      await _loadMessages();
     } catch (e) {
       rethrow;
-    }
-  }
-
-  Future<void> _simulateFileUpload(
-      File file, Function(double)? onProgress) async {
-    final fileSize = await file.length();
-    int uploadedSize = 0;
-    final chunks = await file.readAsBytes();
-
-    // 模拟分块上传
-    for (var i = 0; i < chunks.length; i += 1024) {
-      // 每次处理1KB
-      await Future.delayed(const Duration(milliseconds: 100));
-      uploadedSize = i + 1024;
-      if (uploadedSize > fileSize) {
-        uploadedSize = fileSize;
-      }
-      final progress = uploadedSize / fileSize;
-      onProgress?.call(progress);
     }
   }
 

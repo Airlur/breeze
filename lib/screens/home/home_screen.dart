@@ -249,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final file = File(result.files.single.path!);
         final fileSize = await file.length();
 
-        if (!mounted) return; // 添加 mounted 检查
+        if (!mounted) return;
 
         if (fileSize > 100 * 1024 * 1024) {
           // 100MB
@@ -257,52 +257,16 @@ class _HomeScreenState extends State<HomeScreen> {
           return;
         }
 
-        // 显示上传进度对话框
+        // 直接发送文件消息，不显示进度
+        await context.read<HomeController>().sendFileMessage(file.path);
+
         if (!mounted) return;
-        _showUploadProgress(context);
-
-        // 发送文件消息
-        await context.read<HomeController>().sendFileMessage(
-          file.path,
-          onProgress: (progress) {
-            // 更新进度
-            if (!mounted) return;
-            context.read<HomeController>().updateUploadProgress(progress);
-          },
-        );
-
-        // 关闭进度对话框
-        if (!mounted) return;
-        Navigator.of(context).pop();
-
         Toast.success(context, '文件发送成功');
       }
     } catch (e) {
-      if (!mounted) return; // 添加 mounted 检查
+      if (!mounted) return;
       Toast.error(context, '文件发送失败：$e');
     }
-  }
-
-  // 显示上传进度对话框
-  void _showUploadProgress(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Consumer<HomeController>(
-        builder: (context, controller, child) {
-          return AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text('正在发送文件... ${(controller.uploadProgress * 100).toInt()}%'),
-              ],
-            ),
-          );
-        },
-      ),
-    );
   }
 
   // 构建显示附件选项
@@ -483,11 +447,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(18),
                         ),
                         child: TextField(
                           controller: _messageController,
                           focusNode: _messageFocusNode,
+                          keyboardType: TextInputType.multiline,
+                          maxLines: null,
+                          textInputAction: TextInputAction.newline,
                           decoration: const InputDecoration(
                             hintText: '输入消息...',
                             hintStyle: TextStyle(
@@ -495,7 +462,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontSize: 14,
                             ),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 10),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 8,
+                            ),
+                            isCollapsed: true,
                           ),
                         ),
                       ),
@@ -513,6 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     .read<HomeController>()
                                     .sendTextMessage(message);
                                 _messageController.clear();
+                                FocusScope.of(context).unfocus();
                               }
                             }
                           : null,
