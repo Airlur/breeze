@@ -115,12 +115,19 @@ class TextMessageItem extends MessageItem {
 
   void _showEditDialog(BuildContext context) {
     final controller = TextEditingController(text: message.content);
+    // 光标移到末尾，便于直接编辑
+    controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: controller.text.length),
+    );
+    final focusNode = FocusNode();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('编辑消息'),
         content: TextField(
           controller: controller,
+          focusNode: focusNode,
+          autofocus: true,
           maxLines: null,
           decoration: const InputDecoration(
             hintText: '修改后的消息内容',

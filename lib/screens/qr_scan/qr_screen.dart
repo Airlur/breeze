@@ -71,7 +71,11 @@ class _QrScreenState extends State<QrScreen> {
   Future<void> _shareQrCode(BuildContext context) async {
     try {
       if (!context.mounted) return;
-      await Share.share(widget.content);
+      await SharePlus.instance.share(
+        ShareParams(
+          text: widget.content,
+        ),
+      );
     } catch (e) {
       if (!context.mounted) return;
       Toast.error(context, '分享失败：$e');

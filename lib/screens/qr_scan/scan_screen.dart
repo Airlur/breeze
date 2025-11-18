@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../utils/logger.dart';
 import '../../utils/permission_util.dart';
 
@@ -15,15 +15,16 @@ class _ScanScreenState extends State<ScanScreen>
     with SingleTickerProviderStateMixin {
   final MobileScannerController _scannerController = MobileScannerController();
   bool _isFlashOn = false;
+  // 用于获取顶部顶部按钮容器的Key
+  final GlobalKey _topButtonsKey = GlobalKey(); 
 
-  // 添加动画控制器
+  // 扫描线动画
   late AnimationController _animationController;
   late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
-    // 初始化动画
     _animationController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -61,25 +62,19 @@ class _ScanScreenState extends State<ScanScreen>
           MobileScanner(
             controller: _scannerController,
             onDetect: (capture) {
+              final navigator = Navigator.of(context);
               final List<Barcode> barcodes = capture.barcodes;
-              // 确保只处理一次扫码结果
-              if (barcodes.isNotEmpty &&
-                  barcodes.first.rawValue != null &&
-                  mounted) {
-                // 先停止扫描
+              if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
                 _scannerController.stop();
-                // 使用 Future.delayed 确保扫描器完全停止后再处理结果
                 Future.delayed(Duration.zero, () {
-                  if (mounted) {
-                    if (!context.mounted) return;
-                    Navigator.pop(context, barcodes.first.rawValue);
-                  }
+                  if (!mounted) return;
+                  navigator.pop(barcodes.first.rawValue);
                 });
               }
             },
           ),
 
-          // 扫描框UI
+          // 扫描框
           Center(
             child: Container(
               width: 256,
@@ -89,13 +84,10 @@ class _ScanScreenState extends State<ScanScreen>
               ),
               child: Stack(
                 children: [
-                  // 四角标记
                   _buildCorner(true, true),
                   _buildCorner(true, false),
                   _buildCorner(false, true),
                   _buildCorner(false, false),
-
-                  // 扫描线
                   Positioned(
                     top: 256 * _animation.value,
                     child: Container(
@@ -111,6 +103,7 @@ class _ScanScreenState extends State<ScanScreen>
 
           // 顶部按钮
           Positioned(
+            key: _topButtonsKey,
             top: 0,
             left: 0,
             right: 0,
@@ -143,7 +136,7 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
 
-          // 提示文字
+          // 提示文案
           const Positioned(
             bottom: 120,
             left: 0,
@@ -222,17 +215,22 @@ class _ScanScreenState extends State<ScanScreen>
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
       if (image != null) {
-        await _scannerController.stop();
-        final bool hasBarcode =
-            (await _scannerController.analyzeImage(image.path)) as bool;
+        final result = await _scannerController.analyzeImage(image.path);
 
-        if (!hasBarcode) {
-          _showError('未检测到二维码');
-          await _scannerController.start();
+        final capture = result is BarcodeCapture ? result : null;
+        final hasBarcode = capture != null && capture.barcodes.isNotEmpty;
+
+        if (!mounted) return;
+
+        if (hasBarcode) {
+          Navigator.pop(context, capture.barcodes.first.rawValue);
+        } else {
+          _showError('未检测到二维码，请选择包含二维码的图片');
         }
       }
     } catch (e) {
-      _showError('图片处理失败');
+      if (!mounted) return;
+      _showError('图片处理失败，格式不支持或图片损坏');
       AppLogger.error('图片处理失败', e);
       await _scannerController.start();
     }
@@ -240,8 +238,75 @@ class _ScanScreenState extends State<ScanScreen>
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    // 获取屏幕尺寸和顶部状态栏高度
+    final mediaQuery = MediaQuery.of(context);
+    final topPadding = mediaQuery.padding.top;
+    // 获取顶部按钮容器的高度
+    double topButtonsHeight = 0;
+    if (_topButtonsKey.currentContext != null) {
+      final renderBox = _topButtonsKey.currentContext!.findRenderObject() as RenderBox?;
+      topButtonsHeight = renderBox?.size.height ?? 0; // 按钮容器的实际高度
+    }
+
+    // 提示框顶部偏移 = 状态栏高度 + 顶部按钮容器高度的2/3
+    final topOffset = topPadding + topButtonsHeight * (2/3);
+
+    final overlay = Overlay.of(context);
+    // 创建一个临时的OverlayEntry
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: topOffset, // 动态计算偏移量
+        left: 16,
+        right: 16,
+        child: Material( // 确保文本和背景正确渲染
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [ // 加个阴影增强显示
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 6,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // 添加到Overlay并定时移除
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) entry.remove();
+    });
+  }
+
+  void _showError1(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    final topPadding = MediaQuery.of(context).padding.top;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.black87, fontSize: 14),
+        ),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(16, topPadding + 24, 16, 0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+        dismissDirection: DismissDirection.horizontal,
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 

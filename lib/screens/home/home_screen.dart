@@ -335,8 +335,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildAttachmentOption(
-                    icon: Icons.photo,
-                    label: '图片',
+                    icon: Icons.photo_library,
+                    label: '相册',
                     onTap: () => _pickFile(['jpg', 'jpeg', 'png', 'gif']),
                   ),
                   _buildAttachmentOption(
