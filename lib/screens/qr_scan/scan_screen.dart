@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../utils/logger.dart';
+import '../../utils/permission_util.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -39,6 +40,8 @@ class _ScanScreenState extends State<ScanScreen>
       });
 
     _animationController.forward();
+    // 进入页面时请求相机权限
+    Future.microtask(_ensureCameraPermission);
   }
 
   @override
@@ -68,6 +71,7 @@ class _ScanScreenState extends State<ScanScreen>
                 // 使用 Future.delayed 确保扫描器完全停止后再处理结果
                 Future.delayed(Duration.zero, () {
                   if (mounted) {
+                    if (!context.mounted) return;
                     Navigator.pop(context, barcodes.first.rawValue);
                   }
                 });
@@ -97,7 +101,7 @@ class _ScanScreenState extends State<ScanScreen>
                     child: Container(
                       width: 256,
                       height: 2,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -220,7 +224,7 @@ class _ScanScreenState extends State<ScanScreen>
       if (image != null) {
         await _scannerController.stop();
         final bool hasBarcode =
-            await _scannerController.analyzeImage(image.path);
+            (await _scannerController.analyzeImage(image.path)) as bool;
 
         if (!hasBarcode) {
           _showError('未检测到二维码');
@@ -239,5 +243,15 @@ class _ScanScreenState extends State<ScanScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _ensureCameraPermission() async {
+    final granted =
+        await PermissionUtil().requestCameraPermission(context);
+    if (!mounted) return;
+    if (!granted) {
+      _showError('需要相机权限才能扫码');
+      Navigator.pop(context);
+    }
   }
 }

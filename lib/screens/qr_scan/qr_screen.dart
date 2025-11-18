@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:breeze/widgets/common/toast.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:ui' as ui;
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:breeze/utils/permission_util.dart';
 import 'package:breeze/utils/logger.dart';
 
@@ -44,7 +44,7 @@ class _QrScreenState extends State<QrScreen> {
 
       // 保存到相册
       AppLogger.info('开始保存到相册...');
-      final result = await ImageGallerySaver.saveImage(
+      final result = await ImageGallerySaverPlus.saveImage(
         buffer,
         quality: 100,
         name: 'qr_code_${DateTime.now().millisecondsSinceEpoch}',
@@ -93,7 +93,7 @@ class _QrScreenState extends State<QrScreen> {
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             height: 1,
           ),
         ),
@@ -114,7 +114,7 @@ class _QrScreenState extends State<QrScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 10,
                       spreadRadius: 1,
                     ),
@@ -199,8 +199,8 @@ class _QrScreenState extends State<QrScreen> {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: () {
-                        Clipboard.setData(ClipboardData(text: widget.content))
-                            .then((_) {
+                        Clipboard.setData(ClipboardData(text: widget.content)).then((_) {
+                          if (!context.mounted) return;
                           Toast.success(context, '已复制到剪贴板');
                         });
                       },

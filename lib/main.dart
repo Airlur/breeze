@@ -6,19 +6,12 @@ import 'screens/home/home_screen.dart';
 import 'services/local/db_service.dart';
 import 'services/local/storage_service.dart';
 import 'utils/logger.dart';
-import 'utils/permission_util.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final dbService = DBService();
   final storageService = StorageService();
-
-  // 检查所有权限状态
-  AppLogger.debug('开始检查所有权限状态');
-  await PermissionUtil.checkAllPermissions();
-  AppLogger.debug('权限状态检查完成');
-
 
   // 先清理之前的设备信息，再初始化本机设备信息
   try {

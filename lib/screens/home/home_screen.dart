@@ -1,16 +1,19 @@
+﻿import 'dart:io';
+
+import 'package:breeze/widgets/common/toast.dart';
+import 'package:breeze/widgets/home/settings_menu.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/message.dart';
+
 import '../../models/file.dart';
-import '../../widgets/messages/text_message_item.dart';
-import '../../widgets/messages/file_message_item.dart';
-import 'home_controller.dart';
-import '../qr_scan/scan_screen.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
-import '../../widgets/home/settings_menu.dart';
-import 'package:breeze/widgets/common/toast.dart';
+import '../../models/message.dart';
+import '../../utils/permission_util.dart';
 import '../debug/log_screen.dart';
+import '../qr_scan/scan_screen.dart';
+import 'home_controller.dart';
+import '../../widgets/messages/file_message_item.dart';
+import '../../widgets/messages/text_message_item.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -51,14 +54,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white.withOpacity(0.98),
+      backgroundColor: Colors.white.withValues(alpha: 0.98),
       elevation: 0,
       flexibleSpace: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               offset: const Offset(0, 1),
               blurRadius: 2,
             ),
@@ -123,8 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   builder: (context) => const ScanScreen(),
                 ),
               );
-
-              if (result != null && mounted) {
+              if (!mounted) return;
+              if (result != null) {
                 await context
                     .read<HomeController>()
                     .handleScanResult(result, context);
@@ -153,7 +156,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 构建消息列表
   Widget _buildMessageList() {
     return Consumer<HomeController>(
       builder: (context, controller, child) {
@@ -161,7 +163,8 @@ class _HomeScreenState extends State<HomeScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final messages = controller.messages;
+        // 最新消息在底部，进入页面即看到最新
+        final messages = controller.messages.reversed.toList();
         if (messages.isEmpty) {
           return Center(
             child: Text(
@@ -176,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          reverse: true,
           itemCount: messages.length,
           itemBuilder: (context, index) {
             final message = messages[index];
@@ -187,7 +191,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 onShowQr: (message) => _showQrCode(message),
               );
             } else {
-              // 获取文件信息
               return FutureBuilder<FileModel?>(
                 future:
                     context.read<HomeController>().getFileInfo(message.content),
@@ -213,10 +216,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showToast(String message) {
+    if (!mounted) return;
     Toast.success(context, message);
   }
 
-  // 删除消息
   Future<void> _deleteMessage(String messageId) async {
     try {
       await context.read<HomeController>().deleteMessage(messageId);
@@ -226,21 +229,26 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 显示二维码
   void _showQrCode(Message message) {
     // TODO: 实现二维码显示
   }
 
-  // 处理文件下载
   Future<void> _handleFileDownload(String url) async {
     // TODO: 实现文件下载
     _showToast('开始下载文件...');
   }
 
-  // 选择文件
   Future<void> _pickFile(List<String> allowedExtensions) async {
     try {
       Navigator.pop(context); // 关闭底部菜单
+
+      final granted =
+          await PermissionUtil().requestStoragePermission(context);
+      if (!mounted) return;
+      if (!granted) {
+        Toast.warning(context, '需要存储权限才能选择文件');
+        return;
+      }
 
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -255,12 +263,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!mounted) return;
 
         if (fileSize > 100 * 1024 * 1024) {
-          // 100MB
           Toast.warning(context, '文件大小不能超过100MB');
           return;
         }
 
-        // 直接发送文件消息，不显示进度
         await context.read<HomeController>().sendFileMessage(file.path);
 
         if (!mounted) return;
@@ -272,7 +278,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 构建显示附件选项
   Widget _buildAttachmentOption({
     required IconData icon,
     required String label,
@@ -309,7 +314,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 显示附件选项弹窗
   void _showAttachmentOptions() {
     showModalBottomSheet(
       context: context,
@@ -338,8 +342,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildAttachmentOption(
                     icon: Icons.folder,
                     label: '文件',
-                    onTap: () =>
-                        _pickFile(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt']),
+                    onTap: () => _pickFile(
+                        ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt']),
                   ),
                 ],
               ),
@@ -351,35 +355,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 处理设备管理
   void _handleDeviceManage(BuildContext context) {
-    debugPrint('点击了设备管理');
     Navigator.pop(context);
     // TODO: 实现设备管理
   }
 
-  // 处理清空消息
   void _handleClearMessages(BuildContext context) {
-    debugPrint('点击了清空消息');
     Navigator.pop(context);
     // TODO: 实现清空消息
   }
 
-  // 处理文件管理
   void _handleFileManage(BuildContext context) {
-    debugPrint('点击了文件管理');
     Navigator.pop(context);
     // TODO: 实现文件管理
   }
 
-  // 处理退出登录
   void _handleLogout(BuildContext context) {
-    debugPrint('点击了退出登录');
     Navigator.pop(context);
     // TODO: 实现退出登录
   }
 
-  // 显示设置菜单
   void _showSettingsMenu(BuildContext context) {
     showDialog(
       context: context,
@@ -425,10 +420,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.98),
+                color: Colors.white.withValues(alpha: 0.98),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     offset: const Offset(0, -1),
                     blurRadius: 2,
                   ),

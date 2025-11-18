@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:breeze/widgets/common/toast.dart';
@@ -28,7 +28,7 @@ class ScanResultScreen extends StatelessWidget {
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             height: 1,
           ),
         ),
@@ -63,11 +63,10 @@ class ScanResultScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: content))
-                            .then((_) {
-                          Toast.success(context, '已复制到剪贴板');
-                        });
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: content));
+                        if (!context.mounted) return;
+                        Toast.success(context, '已复制到剪贴板');
                       },
                       icon: const Icon(Icons.copy, color: Colors.grey),
                       label: const Text('复制文本'),
@@ -113,11 +112,10 @@ class ScanResultScreen extends StatelessWidget {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: url!))
-                                    .then((_) {
-                                  Toast.success(context, '已复制到剪贴板');
-                                });
+                              onPressed: () async {
+                                await Clipboard.setData(ClipboardData(text: url!));
+                                if (!context.mounted) return;
+                                Toast.success(context, '已复制到剪贴板');
                               },
                               icon: const Icon(Icons.copy, color: Colors.grey),
                               label: const Text('复制链接'),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'message_item.dart';
 import 'message_action_menu.dart';
-import 'package:flutter/services.dart';
 import '../../screens/qr_scan/qr_screen.dart';
+import '../../screens/home/home_controller.dart';
 import 'package:breeze/widgets/common/toast.dart';
 
 class TextMessageItem extends MessageItem {
@@ -15,18 +17,14 @@ class TextMessageItem extends MessageItem {
   });
 
   void _showActionMenu(BuildContext context) {
+    final rootContext = context;
     final RenderBox button = context.findRenderObject() as RenderBox;
     final Offset offset = button.localToGlobal(Offset.zero);
     final Size screenSize = MediaQuery.of(context).size;
 
-    // 获取消息的尺寸
     final messageHeight = button.size.height;
     final messageTop = offset.dy;
-
-    // 判断消息是否在屏幕上半部分
     final isInUpperHalf = messageTop < screenSize.height / 2;
-
-    // 判断消息是否太长（超过屏幕高度的70%）
     final isMessageTooLong = messageHeight > screenSize.height * 0.7;
 
     showDialog(
@@ -43,34 +41,33 @@ class TextMessageItem extends MessageItem {
           Positioned(
             left: 24,
             right: 24,
-            // 根据条件决定菜单位置
             top: isMessageTooLong
-                ? screenSize.height * 0.3 // 如果消息太长，固定在屏幕中上部
+                ? screenSize.height * 0.3
                 : isInUpperHalf
-                    ? messageTop + messageHeight / 2 // 如果在上半部分，显示在消息下方
-                    : null, // 如果在下半部分，使用 bottom 定位
+                    ? messageTop + messageHeight / 2
+                    : null,
             bottom: isMessageTooLong
                 ? null
                 : isInUpperHalf
-                    ? null // 如果在上半部分，不需要 bottom
-                    : screenSize.height - messageTop, // 如果在下半部分，显示在消息上方
+                    ? null
+                    : screenSize.height - messageTop,
             child: MessageActionMenu(
               message: message,
               onMultiSelect: () {
                 Navigator.pop(context);
               },
-              onCopy: () {
+              onCopy: () async {
                 Navigator.pop(context);
-                Clipboard.setData(ClipboardData(text: message.content))
-                    .then((_) {
-                  Toast.success(context, '已复制到剪贴板');
-                });
+                await Clipboard.setData(ClipboardData(text: message.content));
+                if (!rootContext.mounted) return;
+                Toast.success(rootContext, '已复制到剪贴板');
               },
               onGenerateQR: () {
                 Navigator.pop(context);
                 Future.microtask(() {
+                  if (!rootContext.mounted) return;
                   Navigator.push(
-                    context,
+                    rootContext,
                     MaterialPageRoute(
                       builder: (context) => QrScreen(
                         content: message.content,
@@ -80,11 +77,10 @@ class TextMessageItem extends MessageItem {
                 });
               },
               onEdit: () {
-                debugPrint('点击了编辑');
                 Navigator.pop(context);
+                _showEditDialog(rootContext);
               },
               onDelete: () {
-                debugPrint('点击了删除');
                 Navigator.pop(context);
                 onDelete?.call(message);
               },
@@ -113,6 +109,54 @@ class TextMessageItem extends MessageItem {
           message.content,
           style: const TextStyle(fontSize: 16),
         ),
+      ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context) {
+    final controller = TextEditingController(text: message.content);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('编辑消息'),
+        content: TextField(
+          controller: controller,
+          maxLines: null,
+          decoration: const InputDecoration(
+            hintText: '修改后的消息内容',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newContent = controller.text.trim();
+              if (newContent.isEmpty) {
+                Toast.warning(context, '内容不能为空');
+                return;
+              }
+              if (newContent == message.content) {
+                Navigator.pop(ctx);
+                return;
+              }
+              try {
+                await context
+                    .read<HomeController>()
+                    .editTextMessage(message.id, newContent);
+                if (!context.mounted) return;
+                Toast.success(context, '消息已更新');
+                Navigator.of(context).pop();
+              } catch (e) {
+                if (!context.mounted) return;
+                Toast.error(context, '更新失败: $e');
+              }
+            },
+            child: const Text('保存'),
+          ),
+        ],
       ),
     );
   }

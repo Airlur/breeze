@@ -39,7 +39,7 @@ class _ScanLineAnimationState extends State<ScanLineAnimation>
           right: 0,
           child: Container(
             height: 1,
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
           ),
         );
       },

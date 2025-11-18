@@ -19,6 +19,12 @@ class FileMessageItem extends MessageItem {
   void _showActionMenu(BuildContext context) {
     final RenderBox button = context.findRenderObject() as RenderBox;
     final Offset offset = button.localToGlobal(Offset.zero);
+    final Size screenSize = MediaQuery.of(context).size;
+
+    final messageHeight = button.size.height;
+    final messageTop = offset.dy;
+    final isInUpperHalf = messageTop < screenSize.height / 2;
+    final isMessageTooTall = messageHeight > screenSize.height * 0.7;
 
     showDialog(
       context: context,
@@ -33,10 +39,18 @@ class FileMessageItem extends MessageItem {
             ),
           ),
           Positioned(
-            // 放在上层
             left: 24,
             right: 24,
-            top: offset.dy + button.size.height / 2,
+            top: isMessageTooTall
+                ? screenSize.height * 0.3
+                : isInUpperHalf
+                    ? messageTop + messageHeight / 2
+                    : null,
+            bottom: isMessageTooTall
+                ? null
+                : isInUpperHalf
+                    ? null
+                    : screenSize.height - messageTop,
             child: MessageActionMenu(
               message: message,
               onMultiSelect: () {
@@ -56,6 +70,7 @@ class FileMessageItem extends MessageItem {
               onGenerateQR: () {
                 Navigator.pop(context);
                 Future.microtask(() {
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -170,7 +185,7 @@ class FileMessageItem extends MessageItem {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: iconColor.withOpacity(0.1),
+        color: iconColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
