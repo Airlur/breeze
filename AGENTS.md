@@ -22,7 +22,7 @@
 
 ## 当前状态
 - Flutter 3.35.7；Android：AGP 8.7.1，Kotlin 2.1.0，Gradle 包：`https://mirrors.aliyun.com/macports/distfiles/gradle/gradle-8.9-all.zip`。
-- 主要依赖：file_picker 8.0.0，permission_handler 12.0.1，qr_code_scanner_plus 2.0.14，device_info_plus 12.2.0，image_picker 1.2.0，mobile_scanner 7.1.3，image_gallery_saver_plus 4.0.1，share_plus 12.0.1，provider 6.1.2，sqflite 2.3.3+1，shared_preferences 2.3.3，path_provider 2.1.4，mime 2.0.0。
+- 主要依赖：file_picker 8.0.0，permission_handler 12.0.1，qr_code_scanner_plus 2.0.14，device_info_plus 12.2.0，image_picker 1.2.0，mobile_scanner 7.1.3，image_gallery_saver_plus 4.0.1，share_plus 12.0.1，provider 6.1.2，sqflite 2.3.3+1，shared_preferences 2.3.3，path_provider 2.1.4，mime 2.0.0，open_filex 4.4.0。
 
 ## 目录速览（lib）
 - main.dart：入口，直接进入 HomeScreen，初始化 Storage/DB。
@@ -35,20 +35,22 @@
 
 ## 已实现要点
 - 本地消息/文件存储与展示，搜索框（文本内容）、长按菜单（复制/编辑/删除/生成二维码），消息列表默认最新在底部，发送后无跳动。
-- 扫码（相机/相册）、二维码生成/保存/分享、运行日志查看页。
+- 消息：左滑快捷二维码（松手触发）、右滑删除确认；文件消息可直接打开本地文件并提供确认；文本消息支持识别链接并保持自定义长按菜单；启动耗时日志记录。
+- 扫码/二维码：扫码（相机/相册），二维码生成/保存/分享，二维码展示与保存 UI 美化。
 - 权限申请封装（相机/存储/相册），withValues 避免过时 API。
 
 ## 待开发/完善（由易到难，含前端/本地为主，后端待建）
-1) 消息：文件下载/打开；删除确认弹窗；滑动快捷操作；搜索支持文件名；消息二维码展示页。
+1) 消息：多选批量操作/转发完善；文件消息 UI（图片/视频预览、普通文件气泡优化）；真实网络下载与进度、二维码内容改为下载链接；附件选择器需进一步支持分类与预览。
 2) 设备/文件管理（本地）：设备列表与删除；清空消息；文件管理入口及列表。
 3) 登录认证（本地占位）：主密码登录页、设备初始化与记录；后端建好后接入验证。
-4) UI/提示：文件发送/下载进度；网络/权限/同步等关键错误提示与日志。
+4) UI/提示：文件发送/下载进度；网络/权限/同步等关键错误提示与日志；启动耗时、关键流程性能日志细化。
 5) 后端/同步（待 Cloudflare/Supabase 项目）：登录/设备/消息同步、WebSocket、文件云存储，提供 API 规范后接入。
 6) 其他：退出登录、运行日志扩展（网络/文件/DB/扫码失败等）。
 
 ## 近期变更
 - 消息列表默认展示最新消息在底部（ListView reverse），长按文本编辑能正确更新提示。
-- 扫码：相册未识别二维码/图片处理失败的提示文案更明确，Toast 改为浮动圆角并避开底部按钮。
+- 消息：左滑快捷二维码（松手触发）、右滑删除确认；文件消息支持本地打开；文本链接可点击且菜单保持。
+- 扫码/二维码：相册未识别提示优化，顶部浮动提示；二维码展示/保存 UI 美化。
 - 文本编辑：弹窗光标置末尾并自动聚焦，保存后提示“消息已更新”；附件底部菜单文案改为“相册”。
 
 ## 运行/调试提示

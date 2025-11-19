@@ -14,7 +14,16 @@ class FileMessageItem extends MessageItem {
     super.onShowQr,
     required super.onShowToast,
     super.onDownload,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.onToggleSelect,
+    this.onEnterSelection,
   });
+
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback? onToggleSelect;
+  final VoidCallback? onEnterSelection;
 
   void _showActionMenu(BuildContext context) {
     final RenderBox button = context.findRenderObject() as RenderBox;
@@ -55,6 +64,7 @@ class FileMessageItem extends MessageItem {
               message: message,
               onMultiSelect: () {
                 Navigator.pop(context);
+                onToggleSelect?.call();
               },
               onForward: () {
                 Navigator.pop(context);
@@ -100,46 +110,74 @@ class FileMessageItem extends MessageItem {
     }
 
     return GestureDetector(
-      onLongPress: () => _showActionMenu(context),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: const BorderRadius.only(
-            topRight: Radius.circular(16),
-            bottomLeft: Radius.circular(16),
-            bottomRight: Radius.circular(16),
-          ),
-        ),
-        child: Row(
-          children: [
-            _buildFileIcon(fileInfo!.mimeType),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fileInfo!.filename,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _formatFileSize(fileInfo!.size),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
+      onTap: () {
+        if (selectionMode) {
+          onToggleSelect?.call();
+        }
+      },
+      onLongPress: () {
+        if (selectionMode) {
+          onToggleSelect?.call();
+        } else {
+          onEnterSelection?.call();
+          _showActionMenu(context);
+        }
+      },
+      child: Stack(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.download, color: Colors.grey),
-              onPressed: () => _handleTap(context),
+            child: Row(
+              children: [
+                _buildFileIcon(fileInfo!.mimeType),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fileInfo!.filename,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatFileSize(fileInfo!.size),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.download, color: Colors.grey),
+                  onPressed: () => _handleTap(context),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          if (selectionMode)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Icon(
+                isSelected
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                size: 18,
+                color: isSelected ? Colors.blue : Colors.grey[400],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -201,10 +239,9 @@ class FileMessageItem extends MessageItem {
 
     final file = File(fileInfo!.url);
     if (file.existsSync()) {
-      // TODO: 打开文件
-      onShowToast('打开文件: ${fileInfo!.filename}');
-    } else {
       onDownload?.call(fileInfo!.url);
+    } else {
+      onShowToast('文件不存在或已被删除，暂未实现网络下载');
     }
   }
 }

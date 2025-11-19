@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'message_item.dart';
 import 'message_action_menu.dart';
@@ -14,7 +15,16 @@ class TextMessageItem extends MessageItem {
     required super.onShowToast,
     super.onDelete,
     super.onShowQr,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.onToggleSelect,
+    this.onEnterSelection,
   });
+
+  final bool selectionMode;
+  final bool isSelected;
+  final VoidCallback? onToggleSelect;
+  final VoidCallback? onEnterSelection;
 
   void _showActionMenu(BuildContext context) {
     final rootContext = context;
@@ -55,6 +65,7 @@ class TextMessageItem extends MessageItem {
               message: message,
               onMultiSelect: () {
                 Navigator.pop(context);
+                onToggleSelect?.call();
               },
               onCopy: () async {
                 Navigator.pop(context);
@@ -94,21 +105,106 @@ class TextMessageItem extends MessageItem {
   @override
   Widget buildMessageContent(BuildContext context) {
     return GestureDetector(
-      onLongPress: () => _showActionMenu(context),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: const BorderRadius.only(
-            topRight: Radius.circular(16),
-            bottomLeft: Radius.circular(16),
-            bottomRight: Radius.circular(16),
+      onTap: () {
+        if (selectionMode) {
+          onToggleSelect?.call();
+        }
+      },
+      onLongPress: () {
+        if (selectionMode) {
+          onToggleSelect?.call();
+        } else {
+          onEnterSelection?.call();
+          _showActionMenu(context);
+        }
+      },
+      child: Stack(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+            ),
+            child: _buildLinkedText(context),
+          ),
+          if (selectionMode)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Icon(
+                isSelected
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                size: 18,
+                color: isSelected ? Colors.blue : Colors.grey[400],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinkedText(BuildContext context) {
+    final linkRegExp = RegExp(
+      r'((https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/\S*)?)',
+      caseSensitive: false,
+    );
+    final List<InlineSpan> spans = [];
+    int start = 0;
+    final matches = linkRegExp.allMatches(message.content);
+    for (final match in matches) {
+      if (match.start > start) {
+        spans.add(TextSpan(
+            text: message.content.substring(start, match.start),
+            style: const TextStyle(fontSize: 16)));
+      }
+      final urlText = message.content.substring(match.start, match.end);
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: GestureDetector(
+            onTap: () async {
+              final uri = Uri.tryParse(
+                  urlText.startsWith('http') ? urlText : 'https://$urlText');
+              if (uri == null) {
+                onShowToast('链接无效');
+                return;
+              }
+              final launched =
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (!launched) {
+                onShowToast('无法打开链接');
+              }
+            },
+            child: Text(
+              urlText,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.blue,
+                decoration: TextDecoration.none,
+              ),
+            ),
           ),
         ),
-        child: Text(
-          message.content,
-          style: const TextStyle(fontSize: 16),
-        ),
+      );
+      start = match.end;
+    }
+    if (start < message.content.length) {
+      spans.add(TextSpan(
+        text: message.content.substring(start),
+        style: const TextStyle(fontSize: 16),
+      ));
+    }
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(fontSize: 16, color: Colors.black87),
+        children: spans,
       ),
     );
   }

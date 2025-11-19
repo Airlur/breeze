@@ -157,21 +157,33 @@ class HomeController extends ChangeNotifier {
   // 搜索消息和文件
   void searchMessages(String keyword) {
     _searchDebounceTimer?.cancel();
-    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+    _searchDebounceTimer =
+        Timer(const Duration(milliseconds: 300), () async {
       _isSearching = keyword.isNotEmpty;
       if (_isSearching) {
-        _filteredMessages = _messages.where((message) {
-          final searchText = keyword.toLowerCase();
+        final searchText = keyword.toLowerCase();
+        final List<Message> filtered = [];
 
-          switch (message.type) {
-            case 'text':
-              return message.content.toLowerCase().contains(searchText);
-            case 'file':
-              return message.content.toLowerCase().contains(searchText);
-            default:
-              return false;
+        for (final message in _messages) {
+          if (message.type == 'text') {
+            if (message.content.toLowerCase().contains(searchText)) {
+              filtered.add(message);
+            }
+          } else if (message.type == 'file') {
+            final idMatch =
+                message.content.toLowerCase().contains(searchText);
+            if (idMatch) {
+              filtered.add(message);
+              continue;
+            }
+            final fileInfo = await _db.getFile(message.content);
+            if (fileInfo != null &&
+                fileInfo.filename.toLowerCase().contains(searchText)) {
+              filtered.add(message);
+            }
           }
-        }).toList();
+        }
+        _filteredMessages = filtered;
       } else {
         _filteredMessages = [];
       }

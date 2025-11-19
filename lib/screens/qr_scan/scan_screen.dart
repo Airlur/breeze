@@ -289,27 +289,6 @@ class _ScanScreenState extends State<ScanScreen>
     });
   }
 
-  void _showError1(String message) {
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.clearSnackBars();
-    final topPadding = MediaQuery.of(context).padding.top;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(color: Colors.black87, fontSize: 14),
-        ),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.fromLTRB(16, topPadding + 24, 16, 0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Colors.white,
-        dismissDirection: DismissDirection.horizontal,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   Future<void> _ensureCameraPermission() async {
     final granted =
         await PermissionUtil().requestCameraPermission(context);
