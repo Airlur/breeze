@@ -1,5 +1,7 @@
-﻿import 'dart:io';
+import 'dart:async';
+import 'dart:io';
 
+import 'package:breeze/utils/shortcut_handler.dart';
 import 'package:breeze/widgets/common/toast.dart';
 import 'package:breeze/widgets/home/settings_menu.dart';
 import 'package:file_picker/file_picker.dart';
@@ -33,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _canSend = false;
   final FocusNode _messageFocusNode = FocusNode();
   final Stopwatch _startupWatch = Stopwatch();
+  bool _isOpeningScan = false;
 
   @override
   void initState() {
@@ -44,12 +47,18 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     });
 
-    // 初始化消息列表
+    // 初始化消息列表并记录首帧耗时
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HomeController>().init();
       _startupWatch.stop();
       AppLogger.info(
           'Home 首帧渲染完成，耗时: ${_startupWatch.elapsedMilliseconds}ms');
+    });
+
+    // 监听桌面快捷方式
+    ShortcutHandler.instance.init(() {
+      if (!mounted) return;
+      unawaited(_openScanScreen());
     });
   }
 
@@ -128,20 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!_isSearching) ...[
           IconButton(
             icon: const Icon(Icons.center_focus_weak),
-            onPressed: () async {
-              final result = await Navigator.push<String>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ScanScreen(),
-                ),
-              );
-              if (!mounted) return;
-              if (result != null) {
-                await context
-                    .read<HomeController>()
-                    .handleScanResult(result, context);
-              }
-            },
+            onPressed: _openScanScreen,
           ),
           IconButton(
             icon: const Icon(Icons.bug_report),
@@ -338,6 +334,27 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => QrScreen(content: content),
       ),
     );
+  }
+
+  Future<void> _openScanScreen() async {
+    if (_isOpeningScan) return;
+    _isOpeningScan = true;
+    try {
+      final result = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ScanScreen(),
+        ),
+      );
+      if (!mounted) return;
+      if (result != null) {
+        await context
+            .read<HomeController>()
+            .handleScanResult(result, context);
+      }
+    } finally {
+      _isOpeningScan = false;
+    }
   }
 
   Future<void> _handleFileDownload(String url) async {

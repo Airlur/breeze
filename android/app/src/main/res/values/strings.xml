@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_scan_short">扫一扫</string>
+    <string name="shortcut_scan_long">扫一扫</string>
+    <string name="shortcut_scan_disabled">扫一扫暂不可用</string>
+</resources>

@@ -21,6 +21,8 @@ class HomeController extends ChangeNotifier {
   bool _isSearching = false;
   final String _searchQuery = '';
   Timer? _searchDebounceTimer;
+  bool _initialized = false;
+  bool _deviceInitStarted = false;
 
   List<Message> get messages => _isSearching ? _filteredMessages : _messages;
   bool get isLoading => _isLoading;
@@ -30,11 +32,20 @@ class HomeController extends ChangeNotifier {
 
   // 初始化
   Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+
     _setLoading(true);
+    final stopwatch = Stopwatch()..start();
     try {
       await _loadMessages();
+      AppLogger.info('HomeController 首次加载完成，耗时: ${stopwatch.elapsedMilliseconds}ms');
+    } catch (e, stackTrace) {
+      AppLogger.error('HomeController 初始化失败', e, stackTrace);
     } finally {
+      stopwatch.stop();
       _setLoading(false);
+      _initDeviceInfo();
     }
   }
 
@@ -201,6 +212,20 @@ class HomeController extends ChangeNotifier {
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
+  }
+
+  void _initDeviceInfo() {
+    if (_deviceInitStarted) return;
+    _deviceInitStarted = true;
+
+    final watch = Stopwatch()..start();
+    _storageService.initLocalDevice().then((_) {
+      watch.stop();
+      AppLogger.info('设备信息初始化完成，耗时: ${watch.elapsedMilliseconds}ms');
+    }).catchError((error, stackTrace) {
+      watch.stop();
+      AppLogger.error('HomeController - 设备信息初始化失败', error, stackTrace);
+    });
   }
 
   // 获取文件信息

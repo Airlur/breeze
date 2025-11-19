@@ -10,16 +10,11 @@ import 'utils/logger.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final startupWatch = Stopwatch()..start();
   final dbService = DBService();
   final storageService = StorageService();
-
-  // 先清理之前的设备信息，再初始化本机设备信息
-  try {
-    // await storageService.cleanLocalDevice(); // 【开发】先清理之前的设备信息
-    await storageService.initLocalDevice(); // 【生产】再初始化本机设备信息
-  } catch (e) {
-    AppLogger.error('初始化设备信息失败: $e');
-  }
+  startupWatch.stop();
+  AppLogger.info('主进程依赖初始化耗时: ${startupWatch.elapsedMilliseconds}ms');
 
   runApp(
     MultiProvider(
