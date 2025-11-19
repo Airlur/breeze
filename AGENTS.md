@@ -40,6 +40,7 @@
 - 权限申请封装（相机/存储/相册），withValues 避免过时 API。
 - Android 桌面快捷方式：长按应用图标可直接唤起“扫一扫”页面并回传结果。
 - Android 依赖：因启用 R8 + Flutter deferred components，默认引入 `com.google.android.play:core/core-ktx` 以满足 SplitCompat。
+- APK 体积：AGP 8.9.1 默认将 so 以未压缩方式打包，已启用 packaging.jniLibs.useLegacyPackaging = true 保持历史体积。
 
 ## 待开发/完善（由易到难，含前端/本地为主，后端待建）
 1) 消息：多选批量操作/转发完善；文件消息 UI（图片/视频预览、普通文件气泡优化）；真实网络下载与进度、二维码内容改为下载链接；附件选择器需进一步支持分类与预览。

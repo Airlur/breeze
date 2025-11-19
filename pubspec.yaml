@@ -2,7 +2,7 @@ name: breeze
 description: "A modern messaging app with local-first approach."
 
 publish_to: 'none'
-version: 0.0.3+1
+version: 0.0.3+2
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

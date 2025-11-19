@@ -54,6 +54,13 @@ android {
         versionName = flutterVersionName
     }
 
+    packaging {
+        jniLibs {
+            // 压缩 so，保持与旧版本相近的 apk 体积
+            useLegacyPackaging true
+        }
+    }
+
     signingConfigs {
         if (useSigningConfig) {
             release {
