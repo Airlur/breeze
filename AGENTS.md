@@ -21,7 +21,7 @@
 - 提供优化建议
 
 ## 当前状态
-- Flutter 3.35.7；Android：AGP 8.7.1，Kotlin 2.1.0，Gradle 包：`https://mirrors.aliyun.com/macports/distfiles/gradle/gradle-8.9-all.zip`。
+- Flutter 3.35.7；Android：AGP 8.9.1，Kotlin 2.1.0，Gradle 包：`https://mirrors.aliyun.com/macports/distfiles/gradle/gradle-8.9-all.zip`。
 - 主要依赖：file_picker 8.0.0，permission_handler 12.0.1，qr_code_scanner_plus 2.0.14，device_info_plus 12.2.0，image_picker 1.2.0，mobile_scanner 7.1.3，image_gallery_saver_plus 4.0.1，share_plus 12.0.1，provider 6.1.2，sqflite 2.3.3+1，shared_preferences 2.3.3，path_provider 2.1.4，mime 2.0.0，open_filex 4.4.0。
 
 ## 目录速览（lib）
@@ -55,6 +55,7 @@
 - 文本编辑：弹窗光标置末尾并自动聚焦，保存后提示“消息已更新”；附件底部菜单文案改为“相册”。
 - 启动：设备初始化改为 HomeController 中异步执行，main.dart 只做依赖注入，新日志覆盖主进程和首帧耗时。
 - 安卓桌面快捷方式新增“扫一扫”，MethodChannel 与 ShortcutHandler 完成前后台跳转。
+- GitHub Actions：workflow 使用 Flutter 3.35.7，新增 pub/Gradle 缓存步骤以缩短 release 打包耗时。
 
 ## 运行/调试提示
 - 常用命令：`flutter clean`、`flutter pub get`、`flutter run -v`。

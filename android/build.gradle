@@ -9,8 +9,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // 同步 AGP 版本到 8.2.0
-        classpath 'com.android.tools.build:gradle:8.7.1'
+        // 同步 AGP 版本到 8.9.1
+        classpath 'com.android.tools.build:gradle:8.9.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }

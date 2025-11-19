@@ -22,8 +22,8 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    // 按 Flutter 3.35.7 对齐：AGP 8.7.1 + Kotlin 2.1.0
-    id "com.android.application" version "8.7.1" apply false
+    // 按 Flutter 3.35.7 对齐：AGP 8.9.1 + Kotlin 2.1.0
+    id "com.android.application" version "8.9.1" apply false
     id "org.jetbrains.kotlin.android" version "2.1.0" apply false
 }
 
