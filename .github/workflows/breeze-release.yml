@@ -19,8 +19,10 @@ jobs:
       - name: Get version from pubspec.yaml
         id: get_version
         run: |
-          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          FULL_VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | xargs)
+          VERSION=$(echo $FULL_VERSION | cut -d'+' -f1)
+          echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "display_version=$VERSION" >> $GITHUB_OUTPUT
           
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -68,12 +70,12 @@ jobs:
         shell: bash
         run: |
           cd build/app/outputs/flutter-apk/
-          mv app-release.apk "breeze_v${{ steps.get_version.outputs.version }}_arm64.apk"
+          mv app-release.apk "breeze-${{ steps.get_version.outputs.display_version }}-android-arm64-v8a.apk"
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: build/app/outputs/flutter-apk/breeze_v${{ steps.get_version.outputs.version }}_arm64.apk
+          files: build/app/outputs/flutter-apk/breeze-${{ steps.get_version.outputs.display_version }}-android-arm64-v8a.apk
           tag_name: v${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
