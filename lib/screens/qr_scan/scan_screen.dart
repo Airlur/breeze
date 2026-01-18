@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../../utils/logger.dart';
 import '../../utils/permission_util.dart';
 import '../../utils/mlkit_utils.dart';
+import 'ocr_crop_screen.dart'; // 引入新页面
 
 enum ScanMode { qrCode, ocr }
 
@@ -81,7 +82,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
 
       _cameraController = CameraController(
         _camera!,
-        ResolutionPreset.high,
+        ResolutionPreset.veryHigh, // 提升分辨率
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid 
             ? ImageFormatGroup.nv21 
@@ -454,44 +455,48 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
     setState(() => _isCapturing = true);
 
     try {
-      // 1. 暂停流处理
+      // 1. 彻底暂停流处理和预览
       if (_cameraController!.value.isStreamingImages) {
         await _cameraController!.stopImageStream();
       }
+      // 关键：暂停预览，释放 GPU/Surface 资源
+      await _cameraController!.pausePreview();
       
       // 2. 拍照
       final XFile file = await _cameraController!.takePicture();
       
-      // 3. 识别文字
-      final inputImage = InputImage.fromFilePath(file.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
-
       if (!mounted) return;
-      
-      // 4. 恢复流处理
-      await _cameraController!.startImageStream(_processCameraImage);
       setState(() => _isCapturing = false);
 
-      if (recognizedText.text.trim().isEmpty) {
-        _showError('未识别到文字');
-        return;
+      // 3. 跳转到裁剪编辑页
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OcrCropScreen(imagePath: file.path)),
+      );
+      
+      // 4. 页面返回后恢复
+      if (mounted && _cameraController != null) {
+        // 先恢复预览
+        await _cameraController!.resumePreview();
+        // 再恢复流
+        await _cameraController!.startImageStream(_processCameraImage);
       }
 
-      // 5. 显示结果
-      _showOcrResult(recognizedText.text);
-
     } catch (e) {
-      AppLogger.error('OCR 识别失败', e);
+      AppLogger.error('拍照失败', e);
       if (mounted) {
-        // 尝试恢复流
         try {
-           if (_cameraController != null && !_cameraController!.value.isStreamingImages) {
-             await _cameraController!.startImageStream(_processCameraImage);
+           // 尝试恢复
+           if (_cameraController != null) {
+             await _cameraController!.resumePreview();
+             if (!_cameraController!.value.isStreamingImages) {
+                await _cameraController!.startImageStream(_processCameraImage);
+             }
            }
         } catch (_) {}
 
         setState(() => _isCapturing = false);
-        _showError('识别失败，请重试');
+        _showError('拍照失败，请重试');
       }
     }
   }
