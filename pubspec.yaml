@@ -49,6 +49,8 @@ dependencies:
   open_filex: ^4.4.0
   google_mlkit_text_recognition: ^0.15.0
   google_mlkit_barcode_scanning: ^0.14.1
+  google_mlkit_commons: ^0.11.0
+  image: ^4.0.17
   camera: ^0.11.3
 
 dev_dependencies:

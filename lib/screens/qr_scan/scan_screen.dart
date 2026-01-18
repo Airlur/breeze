@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter/services.dart';
 import '../../utils/logger.dart';
 import '../../utils/permission_util.dart';
 import '../../utils/mlkit_utils.dart';
@@ -120,7 +119,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           if (!mounted) return;
           // 停止流，避免多次触发
           await _cameraController?.stopImageStream(); 
-          Navigator.pop(context, barcodes.first.rawValue);
+          if (mounted) {
+            Navigator.pop(context, barcodes.first.rawValue);
+          }
         }
       } 
       // OCR 模式不自动触发
@@ -469,19 +470,20 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       setState(() => _isCapturing = false);
 
       // 3. 跳转到裁剪编辑页
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => OcrCropScreen(imagePath: file.path)),
-      );
+      if (mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => OcrCropScreen(imagePath: file.path)),
+        );
+      }
       
-      // 4. 页面返回后恢复
+      // 4. 页面返回后恢复流处理
       if (mounted && _cameraController != null) {
         // 先恢复预览
         await _cameraController!.resumePreview();
         // 再恢复流
         await _cameraController!.startImageStream(_processCameraImage);
       }
-
     } catch (e) {
       AppLogger.error('拍照失败', e);
       if (mounted) {
@@ -499,57 +501,6 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         _showError('拍照失败，请重试');
       }
     }
-  }
-
-  void _showOcrResult(String text) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('识别结果', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  TextButton(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: text));
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已复制全部内容')),
-                      );
-                    },
-                    child: const Text('复制全部'),
-                  ),
-                ],
-              ),
-              const Divider(),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  child: SelectableText(
-                    text,
-                    style: const TextStyle(fontSize: 16, height: 1.5),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _showError(String message) {
