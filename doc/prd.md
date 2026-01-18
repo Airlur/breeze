@@ -119,7 +119,7 @@ Flutter客户端:
 - file_picker (文件选择)
 - flutter_local_notifications (本地通知)
 - qr_flutter (二维码生成)
-- mobile_scanner (二维码扫描)
+- camera (二维码扫描)
 - flutter_secure_storage (安全存储)
 - json_serializable (JSON序列化)
 - flutter_i18n (国际化)
