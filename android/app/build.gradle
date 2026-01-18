@@ -48,7 +48,7 @@ android {
         applicationId = "com.airlur.breeze"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdk = flutter.minSdkVersion
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
@@ -108,4 +108,6 @@ flutter {
 dependencies {
     implementation "com.google.android.play:core:1.10.3"
     implementation "com.google.android.play:core-ktx:1.8.1"
+    // 添加离线中文识别支持 (约 5MB)
+    implementation 'com.google.mlkit:text-recognition-chinese:16.0.0'
 }
