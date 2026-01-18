@@ -23,3 +23,10 @@
 -keep class **.R$* {
     public static final int *;
 }
+
+# Google ML Kit 忽略缺失语言包警告
+# 因为我们只依赖了中文包，所以忽略其他语言包的缺失警告
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-dontwarn com.google.mlkit.vision.text.korean.**
+-dontwarn com.google.mlkit.vision.text.latin.**
