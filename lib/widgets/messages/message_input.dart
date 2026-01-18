@@ -46,11 +46,9 @@ class _MessageInputState extends State<MessageInput> {
       textDirection: TextDirection.ltr,
     );
     
-    // 使用 MediaQuery 获取屏幕宽度进行估算，避免 LayoutBuilder 导致的死循环
-    // 减去输入框内部的 Padding (左右各16 = 32)
-    // 额外减去 外部padding和按钮占用的宽度 (约 168)
-    // 估算：屏幕宽度 - (16+16 outer) - (48 attach) - (12 gap) - (12 gap) - (48 right col) - (32 inner) ≈ 屏幕宽度 - 184
-    final textContentWidth = MediaQuery.of(context).size.width - 184;
+    // 屏幕宽度 - (16+16 outer) - (48 attach) - (12 gap) - (12 gap) - (48 right col) - (32 inner) ≈ 屏幕宽度 - 184
+    // 为了更早触发展开按钮，我们多减去一些，假设宽度更窄
+    final textContentWidth = MediaQuery.of(context).size.width - 200;
     
     tp.layout(maxWidth: textContentWidth > 0 ? textContentWidth : 0);
     final lineMetrics = tp.computeLineMetrics();
@@ -127,10 +125,10 @@ class _MessageInputState extends State<MessageInput> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.98),
+        color: Colors.white.withOpacity(0.98),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             offset: const Offset(0, -1),
             blurRadius: 2,
           ),
@@ -139,63 +137,62 @@ class _MessageInputState extends State<MessageInput> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 附件按钮 (底部对齐)
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.attach_file,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // 附件按钮 (底部对齐)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 0),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.attach_file,
+                    color: Colors.grey,
+                  ),
+                  onPressed: widget.onAttachmentTap,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // 输入框区域
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 4), // 添加底部间距实现视觉居中
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    keyboardType: TextInputType.multiline,
+                    minLines: 1,
+                    maxLines: 6,
+                    textInputAction: TextInputAction.newline,
+                    style: const TextStyle(fontSize: 16, height: 1.25),
+                    textAlignVertical: TextAlignVertical.center,
+                    decoration: const InputDecoration(
+                      hintText: '输入消息...', // Corrected: Removed unnecessary escaping
+                      hintStyle: TextStyle(
                         color: Colors.grey,
+                        fontSize: 14,
                       ),
-                      onPressed: widget.onAttachmentTap,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.fromLTRB(16, 10, 16, 10),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                // 输入框区域
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      keyboardType: TextInputType.multiline,
-                      minLines: 1,
-                      maxLines: 6,
-                      textInputAction: TextInputAction.newline,
-                      style: const TextStyle(fontSize: 16, height: 1.25), // 显式指定样式
-                      decoration: const InputDecoration(
-                        hintText: '输入消息...',
-                        hintStyle: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.fromLTRB(16, 12, 16, 12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // 右侧操作区
-                Column(
-                  mainAxisAlignment: _showExpandButton 
-                      ? MainAxisAlignment.spaceBetween 
-                      : MainAxisAlignment.end,
-                  children: [
+              ),
+              const SizedBox(width: 12),
+              // 右侧操作区
+              Column(
+                mainAxisSize: MainAxisSize.min, // 确保 Column 包裹内容
+                mainAxisAlignment: _showExpandButton 
+                    ? MainAxisAlignment.spaceBetween 
+                    : MainAxisAlignment.end,
+                children: [
                     // 上方：展开按钮
                     if (_showExpandButton)
                       Padding(
@@ -212,7 +209,7 @@ class _MessageInputState extends State<MessageInput> {
                     
                     // 下方：发送按钮
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 0),
                       child: IconButton(
                         icon: Icon(
                           Icons.send,
@@ -229,8 +226,7 @@ class _MessageInputState extends State<MessageInput> {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -302,7 +298,7 @@ class _ExpandedInputContentState extends State<_ExpandedInputContent> {
                   textAlignVertical: TextAlignVertical.top,
                   style: const TextStyle(fontSize: 16, height: 1.25),
                   decoration: const InputDecoration(
-                    hintText: '输入消息内容...', 
+                    hintText: '输入消息内容...', // Corrected: Removed unnecessary escaping
                     border: InputBorder.none,
                   ),
                 ),
@@ -327,7 +323,7 @@ class _ExpandedInputContentState extends State<_ExpandedInputContent> {
                         color: _canSend ? Colors.black : Colors.grey[400],
                       ),
                       onPressed: _canSend 
-                          ? () => widget.onSend(_textController.text.trim()) 
+                          ? () => widget.onSend(_textController.text.trim())
                           : null,
                     ),
                   ),
