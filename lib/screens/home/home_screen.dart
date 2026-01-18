@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:open_filex/open_filex.dart';
 
+import 'package:breeze/widgets/messages/message_input.dart';
 import '../../models/file.dart';
 import '../../models/message.dart';
 import '../../utils/logger.dart';
@@ -31,9 +32,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _messageController = TextEditingController();
-  bool _canSend = false;
-  final FocusNode _messageFocusNode = FocusNode();
   final Stopwatch _startupWatch = Stopwatch();
   bool _isOpeningScan = false;
 
@@ -41,11 +39,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _startupWatch.start();
-    _messageController.addListener(() {
-      setState(() {
-        _canSend = _messageController.text.trim().isNotEmpty;
-      });
-    });
 
     // 初始化消息列表并记录首帧耗时
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -65,8 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _messageController.dispose();
-    _messageFocusNode.dispose();
     super.dispose();
   }
 
@@ -640,78 +631,11 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: _buildMessageList(),
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.98),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    offset: const Offset(0, -1),
-                    blurRadius: 2,
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: SafeArea(
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.attach_file,
-                        color: Colors.grey,
-                      ),
-                      onPressed: _showAttachmentOptions,
-                    ),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: TextField(
-                          controller: _messageController,
-                          focusNode: _messageFocusNode,
-                          keyboardType: TextInputType.multiline,
-                          maxLines: null,
-                          textInputAction: TextInputAction.newline,
-                          decoration: const InputDecoration(
-                            hintText: '输入消息...',
-                            hintStyle: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              vertical: 8,
-                            ),
-                            isCollapsed: true,
-                          ),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.send,
-                        color: _canSend ? Colors.black : Colors.grey[400],
-                      ),
-                      onPressed: _canSend
-                          ? () {
-                              final message = _messageController.text.trim();
-                              if (message.isNotEmpty) {
-                                context
-                                    .read<HomeController>()
-                                    .sendTextMessage(message);
-                                _messageController.clear();
-                                FocusScope.of(context).unfocus();
-                              }
-                            }
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
+            MessageInput(
+              onSend: (text) {
+                context.read<HomeController>().sendTextMessage(text);
+              },
+              onAttachmentTap: _showAttachmentOptions,
             ),
           ],
         ),
